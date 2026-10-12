@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>아무말 컴파일러</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Scratch-style workbench — word-card hand on top, snap-together block script below, token converter + stage on the right */
+:root{
+  --bg:#EEF1F7; --grid:#D9DEEA; --panel:#FFFFFF; --ink:#1F2433; --muted:#6B7287; --line:#D5DAE6;
+  --card:#FFFDF6; --card-ink:#2A2A33; --slot:#FFFFFF; --slot-ink:#2A2A33;
+  --accent:#4C5BD4; --accent-ink:#FFFFFF; --stage:#0F1220;
+  --c-who:#E89B00; --c-where:#22936A; --c-like:#D13F78; --c-act:#3A68DB; --c-hit:#8452D1; --c-result:#DD5A24; --c-unit:#14909E;
+  --b-event:#F2B21D; --b-event-d:#C98F05; --b-ctrl:#F08A24; --b-ctrl-d:#C76A10; --b-motion:#4C7BEA; --b-motion-d:#2F5BC4; --b-var:#16A3A0; --b-var-d:#0E7F7C;
+  --tok1:#E3E8FF; --tok2:#FFE6D6; --tok3:#DDF4E8; --tok4:#F8E0F0;
+  --f-display:"Black Han Sans","Jua",system-ui,sans-serif;
+  --f-block:"Jua","IBM Plex Sans KR",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12141B; --grid:#1E2230; --panel:#1B1E29; --ink:#E7EAF3; --muted:#9097AD; --line:#2C3142;
+  --card:#262A37; --card-ink:#F1F2F6; --slot:#F4F5F9; --slot-ink:#1E2230;
+  --accent:#7C88F2; --accent-ink:#0F1220; --stage:#090B13;
+  --c-who:#FFB52E; --c-where:#3CC48F; --c-like:#F06A9E; --c-act:#6F95FF; --c-hit:#A983F0; --c-result:#FF8250; --c-unit:#36BFCB;
+  --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141B; --grid:#1E2230; --panel:#1B1E29; --ink:#E7EAF3; --muted:#9097AD; --line:#2C3142;
+  --card:#262A37; --card-ink:#F1F2F6; --slot:#F4F5F9; --slot-ink:#1E2230;
+  --accent:#7C88F2; --accent-ink:#0F1220; --stage:#090B13;
+  --c-who:#FFB52E; --c-where:#3CC48F; --c-like:#F06A9E; --c-act:#6F95FF; --c-hit:#A983F0; --c-result:#FF8250; --c-unit:#36BFCB;
+  --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  background-image:radial-gradient(var(--grid) 1.2px,transparent 1.2px);background-size:22px 22px}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:18px 40px;display:flex;flex-direction:column;gap:16px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,.card:focus-visible,.slot:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,4.5vw,44px);line-height:1;margin:0;letter-spacing:-.5px}
+h1 small{display:block;font-family:var(--f-body);font-size:14px;color:var(--muted);letter-spacing:0;margin-top:8px;font-weight:400}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn b{font-variant-numeric:tabular-nums;color:var(--accent)}
+
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ph{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ph h2{margin:0;font-family:var(--f-block);font-weight:400;font-size:20px}
+.ph span{font-size:12.5px;color:var(--muted)}
+
+/* hand */
+.hand{display:flex;flex-wrap:wrap;gap:10px;min-height:64px;padding:4px 2px}
+.card{background:var(--card);color:var(--card-ink);border:1.5px solid var(--line);border-radius:10px;padding:6px 12px 8px;
+  font-family:var(--f-block);font-size:17px;line-height:1.2;display:flex;flex-direction:column;gap:2px;
+  box-shadow:0 2px 0 var(--line);transform:rotate(var(--r,0deg));transition:transform .15s,box-shadow .15s;user-select:none;touch-action:manipulation}
+.card:hover{transform:rotate(0) translateY(-2px)}
+.card .cat{font-family:var(--f-body);font-size:11px;letter-spacing:.06em;display:flex;align-items:center;gap:5px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.card.sel{border-color:var(--c);box-shadow:0 0 0 3px var(--c);transform:rotate(0) translateY(-3px)}
+.hand-empty{color:var(--muted);font-size:13px;align-self:center}
+
+/* script blocks */
+.script{display:flex;flex-direction:column;padding:6px 0 12px;overflow-x:auto}
+.blk{position:relative;color:#fff;font-family:var(--f-block);font-size:17px;padding:10px 14px 12px;border-radius:6px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:max-content;max-width:100%;min-width:260px;margin-bottom:-2px;
+  box-shadow:inset 0 -3px 0 var(--d)}
+.blk::after{content:"";position:absolute;left:18px;bottom:-7px;width:26px;height:8px;background:var(--b);border-radius:0 0 5px 5px;z-index:2;box-shadow:inset 0 -2px 0 var(--d)}
+.blk{background:var(--b)}
+.ev{--b:var(--b-event);--d:var(--b-event-d);border-radius:26px 26px 6px 6px / 18px 18px 6px 6px;padding-top:16px;color:#2B2000}
+.ctrl{--b:var(--b-ctrl);--d:var(--b-ctrl-d)}
+.mot{--b:var(--b-motion);--d:var(--b-motion-d)}
+.var{--b:var(--b-var);--d:var(--b-var-d)}
+.cblk{display:flex;flex-direction:column;width:max-content;max-width:100%;margin-bottom:-2px;position:relative}
+.cblk .top{border-radius:6px 6px 0 6px;box-shadow:none;padding-bottom:10px}
+.cblk .top::after{left:40px}
+.cblk .mid{display:flex}
+.cblk .arm{width:22px;background:var(--b-ctrl);flex:none}
+.cblk .inner{padding:2px 0 4px;min-width:0}
+.cblk .inner .blk{margin:0}
+.cblk .foot{height:22px;width:120px;background:var(--b-ctrl);border-radius:0 6px 6px 6px;box-shadow:inset 0 -3px 0 var(--b-ctrl-d);position:relative}
+.cblk .foot::after{content:"";position:absolute;left:18px;bottom:-7px;width:26px;height:8px;background:var(--b-ctrl);border-radius:0 0 5px 5px;box-shadow:inset 0 -2px 0 var(--b-ctrl-d)}
+.cblk .foot small{position:absolute;right:8px;top:2px;font-size:13px;color:#fff;font-family:var(--f-block)}
+.blk .flag{width:20px;height:20px;flex:none}
+.slot{background:var(--slot);color:var(--slot-ink);border:2px dashed transparent;border-radius:999px;padding:4px 12px;min-width:92px;min-height:32px;
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--f-block);font-size:16px;line-height:1.15;text-align:left;transition:box-shadow .15s}
+.slot.empty{color:#8A90A3;border-color:var(--c);background:var(--slot)}
+.slot.empty .dot{opacity:.8}
+.slot.target{box-shadow:0 0 0 4px rgba(255,255,255,.85),0 0 0 7px var(--c);animation:pulse 1s ease-in-out infinite}
+.slot.over{transform:scale(1.06)}
+@keyframes pulse{50%{box-shadow:0 0 0 4px rgba(255,255,255,.85),0 0 0 10px var(--c)}}
+.josa{opacity:.95}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+
+/* converter */
+.sentence{font-family:var(--f-block);font-size:clamp(20px,2.6vw,26px);line-height:1.45;margin:0;text-wrap:balance}
+.sentence .w{border-bottom:3px solid var(--c);padding-inline:1px}
+.sentence .gap{color:var(--muted);border-bottom:3px dotted var(--muted)}
+.tokens{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--f-mono);font-size:13px}
+.tok{padding:1px 4px;border-radius:4px;background:var(--tok1)}
+.tok:nth-child(4n+2){background:var(--tok2)}.tok:nth-child(4n+3){background:var(--tok3)}.tok:nth-child(4n+4){background:var(--tok4)}
+.meter{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.meter b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:15px}
+.go{display:flex;gap:8px;flex-wrap:wrap}
+.cta{background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;padding:12px 18px;font-family:var(--f-block);font-size:19px;flex:1 1 220px;
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.2)}
+.cta:disabled{opacity:.5;cursor:not-allowed}
+.status{font-size:13px;color:var(--muted);min-height:1.5em;margin:0}
+
+/* stage */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:6px 10px;color:var(--muted);font-weight:600;font-size:14px}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
+.stage{position:relative;background:var(--stage);border-radius:10px;aspect-ratio:4/3;max-width:100%;overflow:hidden}
+.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+.stage .idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#B9C0DA;text-align:center;padding:24px}
+.stage .idle strong{font-family:var(--f-display);font-weight:400;font-size:26px;color:#fff}
+.stage .idle p{margin:0;max-width:34ch;font-size:14px}
+.codebox{background:var(--stage);color:#C9D2F5;font-family:var(--f-mono);font-size:12px;line-height:1.55;border-radius:10px;padding:12px;
+  height:min(60vh,420px);overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>아무말 컴파일러<small>받은 단어 카드로 블록을 채우면, 그 아무말이 그대로 바이브 코딩 명령이 되어 게임으로 빌드됩니다.</small></h1>
+    <div class="tools">
+      <button class="btn" id="reroll">패 바꾸기 <b id="rerollN">3</b></button>
+      <button class="btn" id="auto">손패로 자동 채우기</button>
+      <button class="btn" id="newgame">새 판</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="h-work">
+      <div class="ph"><h2 id="h-work">작업대</h2><span>카드를 누른 뒤 같은 색 칸을 누르세요 (끌어다 놓아도 돼요)</span></div>
+      <div class="hand" id="hand" aria-label="손패"></div>
+      <div class="script" id="script">
+        <div class="blk ev">
+          <svg class="flag" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 2v16" stroke="#2B2000" stroke-width="2" fill="none"/><path d="M5 3h10l-2.5 3.5L15 10H5z" fill="#3BB54A" stroke="#1E7A2A"/></svg>
+          <span>시작하면</span><span data-slot="who"></span><span class="josa" data-j="who">이(가)</span><span data-slot="where"></span><span>에서 등장</span>
+        </div>
+        <div class="cblk">
+          <div class="blk ctrl top"><span>무한 반복</span></div>
+          <div class="mid"><div class="arm"></div><div class="inner">
+            <div class="blk mot"><span data-slot="like"></span><span data-slot="act"></span></div>
+          </div></div>
+          <div class="foot"><small>↻</small></div>
+        </div>
+        <div class="blk ctrl"><span>만약</span><span data-slot="hit"></span><span class="josa" data-j="hit">에 닿으면</span><span data-slot="result"></span></div>
+        <div class="blk var"><span>점수 단위를</span><span data-slot="unit"></span><span class="josa" data-j="unit">(으)로 정하기</span></div>
+      </div>
+      <p class="hint">칸에 놓인 카드를 다시 누르면 손패로 돌아와요. 패 바꾸기는 칸에 놓이지 않은 카드만 새로 뽑아요.</p>
+    </section>
+
+    <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <section class="panel" aria-labelledby="h-tok">
+        <div class="ph"><h2 id="h-tok">토큰 변환기</h2><span>블록 → 문장 → 토큰 → 바이브 코딩 명령</span></div>
+        <p class="sentence" id="sentence"></p>
+        <div class="tokens" id="tokens" aria-label="토큰 미리보기"></div>
+        <div class="meter"><span>채운 칸 <b id="mFill">0/7</b></span><span>문장 토큰 <b id="mTok">0</b></span><span>최종 명령 토큰 <b id="mPrompt">0</b></span></div>
+        <div class="go">
+          <button class="cta" id="build" disabled>토큰 연결하고 게임 만들기</button>
+          <button class="btn" id="copy">명령어 복사</button>
+        </div>
+        <p class="status" id="status" role="status"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-stage">
+        <div class="ph"><h2 id="h-stage">무대</h2><span id="stageMeta">아직 빌드한 게임이 없어요</span></div>
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" aria-selected="true" data-tab="play" id="t-play">플레이</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="code" id="t-code">코드</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="prompt" id="t-prompt">명령어</button>
+        </div>
+        <div id="v-play">
+          <div class="stage" id="stage">
+            <div class="idle"><strong>여기서 실행돼요</strong><p>일곱 칸을 다 채우고 “토큰 연결하고 게임 만들기”를 누르면 Claude가 그 아무말을 진지하게 게임으로 만듭니다.</p></div>
+          </div>
+        </div>
+        <pre class="codebox" id="v-code" hidden>아직 코드가 없어요.</pre>
+        <pre class="codebox" id="v-prompt" hidden></pre>
+        <div class="row">
+          <button class="btn" id="stop" hidden>멈추기</button>
+          <button class="btn" id="restart" hidden>게임 다시 불러오기</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATS = {
+  who:   {label:"주인공", color:"--c-who", words:["매국노","은퇴한 슬라임","월급 밀린 용","사춘기 냉장고","철학하는 고등어","미역 줄기 기사","탈모 고민 중인 사자","출근하는 유령","감성 충만 지게차","3대 500 치는 햄스터","시험기간 펭귄","다이어트 중인 두더지","이장님 트랙터","소심한 공룡"]},
+  where: {label:"무대", color:"--c-where", words:["반지하 우주정거장","김치냉장고 속","월요일 아침 지하철","거대한 떡볶이 국물","구청 민원실","무한 엘리베이터","노래방 7번 방","화산 위 독서실","편의점 냉동고","사우나 열탕","교무실 앞 복도","결혼식 뷔페"]},
+  like:  {label:"방식", color:"--c-like", words:["매국노처럼","첫사랑처럼","마감 직전 작가처럼","신입사원처럼","고장 난 로봇청소기처럼","등짝 스매싱처럼","소개팅 나간 너구리처럼","수능 전날처럼","말년 병장처럼","발레리나처럼","헤어진 연인처럼","택배 기사처럼"]},
+  act:   {label:"행동", color:"--c-act", words:["뒤로 걷는다","김밥을 던진다","랩을 한다","계속 점프한다","낮잠을 잔다","반성문을 쓴다","빙글빙글 돈다","순간이동한다","사과한다","박수를 친다","눈치를 본다","춤을 춘다"]},
+  hit:   {label:"장애물", color:"--c-hit", words:["붕어빵","팀장님","고양이 털","택배 상자","지각 벌점","민트초코","비둘기 떼","바나나 껍질","무한 리필 단무지","알람시계","엄마 잔소리","시험지"]},
+  result:{label:"결과", color:"--c-result", words:["크기가 두 배가 된다","고백을 받는다","화면이 뒤집힌다","둘로 분열한다","음악이 빨라진다","느려진다","온 세상이 분홍색이 된다","처음부터 다시 시작한다","점수가 반토막 난다","갑자기 비가 온다","방귀를 뀐다","하늘로 날아간다"]},
+  unit:  {label:"점수 단위", color:"--c-unit", words:["칼로리","한숨","눈치","체면","김치 포기","학점","반성 지수","하트","주식 수익률","퇴근 시간","좋아요","흑역사"]}
+};
+const ORDER = ["who","where","like","act","hit","result","unit"];
+const PER_CAT = 2, REROLLS = 3;
+
+let uid = 0;
+let state; // {hand:[card], slots:{cat:card|null}, rerolls}
+let selected = null;
+
+const $ = s => document.querySelector(s);
+const rnd = a => a[Math.floor(Math.random()*a.length)];
+
+function drawWord(cat, exclude){
+  const pool = CATS[cat].words.filter(w => !exclude.has(w));
+  return {id:"c"+(++uid), cat, text: rnd(pool.length?pool:CATS[cat].words), r:(Math.random()*5-2.5).toFixed(1)};
+}
+function inPlay(){ return new Set([...state.hand.map(c=>c.text), ...Object.values(state.slots).filter(Boolean).map(c=>c.text)]); }
+
+function newGame(){
+  state = {hand:[], slots:Object.fromEntries(ORDER.map(k=>[k,null])), rerolls:REROLLS};
+  for(const cat of ORDER) for(let i=0;i<PER_CAT;i++) state.hand.push(drawWord(cat, inPlay()));
+  shuffle(state.hand);
+  autoFill(); // start in a playable state: one card per slot, one spare per category
+  selected = null; render();
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} }
+function autoFill(){
+  for(const cat of ORDER){
+    if(state.slots[cat]) continue;
+    const opts = state.hand.filter(c=>c.cat===cat);
+    if(!opts.length) continue;
+    const pick = rnd(opts);
+    state.hand = state.hand.filter(c=>c!==pick);
+    state.slots[cat] = pick;
+  }
+}
+function place(cardId, cat){
+  const card = state.hand.find(c=>c.id===cardId);
+  if(!card || card.cat!==cat) return false;
+  state.hand = state.hand.filter(c=>c!==card);
+  if(state.slots[cat]) state.hand.push(state.slots[cat]);
+  state.slots[cat] = card;
+  selected = null; render(); return true;
+}
+function unplace(cat){
+  const c = state.slots[cat]; if(!c) return;
+  state.slots[cat] = null; state.hand.push(c); selected = null; render();
+}
+
+/* Korean particles */
+function jong(w){ const t=w.trim(); const c=t.charCodeAt(t.length-1); if(c<0xAC00||c>0xD7A3) return 0; return (c-0xAC00)%28; }
+const iGa = w => jong(w) ? "이" : "가";
+const euro = w => { const j=jong(w); return (j===0||j===8) ? "로" : "으로"; };
+
+function words(){ const o={}; for(const k of ORDER) o[k]=state.slots[k]?.text||null; return o; }
+function filled(){ return ORDER.filter(k=>state.slots[k]).length; }
+
+function sentenceParts(){
+  const w = words();
+  const P = (k) => ({k, t:w[k]});
+  return [
+    P("who"), {t: w.who ? iGa(w.who)+" " : "이(가) "}, P("where"), {t:"에서 "}, P("like"), {t:" "}, P("act"), {t:". "},
+    P("hit"), {t:"에 닿으면 "}, P("result"), {t:". 점수는 "}, P("unit"), {t: (w.unit?euro(w.unit):"(으)로")+" 센다."}
+  ];
+}
+function sentenceText(){ return sentenceParts().map(p=>p.k ? (p.t||"[ ? ]") : p.t).join(""); }
+
+function buildPrompt(){
+  const w = words(); const s = sentenceText();
+  return `너는 바이브 코딩 엔진이다. 아래의 말도 안 되는 명령을 최대한 진지하게 해석해서, 실제로 플레이할 수 있는 브라우저 미니게임으로 만들어라.
+
+명령: "${s}"
+
+해석 가이드
+- 주인공(플레이어가 조종): ${w.who}
+- 무대(배경과 분위기): ${w.where}
+- 움직임 방식: "${w.like} ${w.act}" — 이 비유를 조작감이나 핵심 메커닉으로 재치 있게 바꿔라.
+- 장애물/아이템: ${w.hit} — 닿으면 "${w.result}"
+- 점수 단위: ${w.unit} (화면의 점수 옆에 이 단위를 붙여라)
+
+만들기 규칙
+- 완전한 HTML 문서 하나. <!doctype html>부터 </html>까지.
+- 외부 리소스 금지: 이미지 파일, 웹폰트, CDN 스크립트를 쓰지 마라. 그래픽은 canvas 도형과 이모지, 텍스트로 그려라.
+- 키보드(방향키, 스페이스)와 터치/클릭을 모두 지원하라.
+- 상단에 게임 제목, 점수, 한 줄 조작법. 게임 오버 화면과 다시하기 버튼은 canvas나 DOM 안에서 처리하라.
+- 창 크기에 맞춰 canvas를 꽉 채우고, body 여백 0, 스크롤 없음.
+- alert/confirm/prompt, localStorage, fetch 사용 금지.
+- 화면에 보이는 글자는 모두 한국어. 코드는 250줄 안팎.
+- 답은 \`\`\`html 코드 블록 하나만. 앞뒤 설명 없이.`;
+}
+
+/* rough token estimate: Hangul ≈ 1 token per syllable pair-ish, ASCII ≈ 4 chars per token */
+function estTokens(s){
+  let h=0,a=0; for(const ch of s){ const c=ch.charCodeAt(0); if(c>=0xAC00&&c<=0xD7A3) h++; else a++; }
+  return Math.round(h*0.9 + a/3.6);
+}
+function tokenize(s){
+  const out=[]; for(const word of s.split(/(\s+)/)){ if(!word) continue; if(/^\s+$/.test(word)){ continue; }
+    for(let i=0;i<word.length;i+=2) out.push((i===0?"·":"")+word.slice(i,i+2)); }
+  return out;
+}
+
+/* ---------- render ---------- */
+function cardEl(c){
+  const b=document.createElement("button");
+  b.className="card"+(selected===c.id?" sel":""); b.dataset.id=c.id; b.draggable=true;
+  b.style.setProperty("--r", c.r+"deg"); b.style.setProperty("--c", `var(${CATS[c.cat].color})`);
+  b.innerHTML=`<span class="cat"><span class="dot"></span>${CATS[c.cat].label}</span><span></span>`;
+  b.lastChild.textContent=c.text;
+  b.setAttribute("aria-pressed", selected===c.id);
+  b.onclick=()=>{ selected = selected===c.id?null:c.id; render(); };
+  b.ondragstart=e=>{ e.dataTransfer.setData("text/plain",c.id); selected=c.id; highlight(); };
+  b.ondragend=()=>{ selected=null; render(); };
+  return b;
+}
+function render(){
+  const hand=$("#hand"); hand.innerHTML="";
+  const sorted=[...state.hand].sort((a,b)=>ORDER.indexOf(a.cat)-ORDER.indexOf(b.cat));
+  sorted.forEach(c=>hand.appendChild(cardEl(c)));
+  if(!sorted.length){ const p=document.createElement("span"); p.className="hand-empty"; p.textContent="손패가 비었어요. 칸의 카드를 눌러 돌려받을 수 있어요."; hand.appendChild(p); }
+
+  document.querySelectorAll("[data-slot]").forEach(holder=>{
+    const cat=holder.dataset.slot, c=state.slots[cat];
+    const b=document.createElement("button");
+    b.className="slot"+(c?"":" empty"); b.dataset.cat=cat;
+    b.style.setProperty("--c", `var(${CATS[cat].color})`);
+    b.innerHTML=`<span class="dot"></span><span></span>`;
+    b.lastChild.textContent = c ? c.text : CATS[cat].label;
+    b.setAttribute("aria-label", `${CATS[cat].label} 칸: ${c?c.text:"비어 있음"}`);
+    b.onclick=()=>{ if(selected){ const sc=state.hand.find(x=>x.id===selected); if(sc && sc.cat===cat){ place(selected,cat); return; } } if(c) unplace(cat); };
+    b.ondragover=e=>{ const sc=state.hand.find(x=>x.id===selected); if(sc&&sc.cat===cat){ e.preventDefault(); b.classList.add("over"); } };
+    b.ondragleave=()=>b.classList.remove("over");
+    b.ondrop=e=>{ e.preventDefault(); place(e.dataTransfer.getData("text/plain")||selected, cat); };
+    holder.replaceChildren(b);
+  });
+
+  const w=words();
+  $('[data-j="who"]').textContent = w.who ? iGa(w.who) : "이(가)";
+  $('[data-j="unit"]').textContent = (w.unit ? euro(w.unit) : "(으)로")+" 정하기";
+
+  const sEl=$("#sentence"); sEl.innerHTML="";
+  for(const p of sentenceParts()){
+    if(p.k){ const s=document.createElement("span"); s.style.setProperty("--c",`var(${CATS[p.k].color})`);
+      s.className=p.t?"w":"gap"; s.textContent=p.t||CATS[p.k].label; sEl.appendChild(s); }
+    else sEl.appendChild(document.createTextNode(p.t));
+  }
+  const sent=sentenceText();
+  const tk=$("#tokens"); tk.innerHTML="";
+  tokenize(sent).forEach(t=>{ const s=document.createElement("span"); s.className="tok"; s.textContent=t; tk.appendChild(s); });
+  const n=filled();
+  $("#mFill").textContent=`${n}/7`;
+  $("#mTok").textContent=estTokens(sent);
+  $("#mPrompt").textContent= n===7 ? estTokens(buildPrompt()) : "—";
+  $("#v-prompt").textContent = n===7 ? buildPrompt() : "일곱 칸을 다 채우면 최종 명령어가 여기 나타나요.";
+  $("#build").disabled = n<7 || busy || sampleState==="off";
+  $("#rerollN").textContent=state.rerolls;
+  $("#reroll").disabled = state.rerolls<=0 || !state.hand.length;
+  highlight();
+  saveLocal();
+}
+function highlight(){
+  const sc = state.hand.find(x=>x.id===selected);
+  document.querySelectorAll(".slot").forEach(s=>s.classList.toggle("target", !!sc && sc.cat===s.dataset.cat));
+}
+
+/* ---------- controls ---------- */
+$("#reroll").onclick=()=>{
+  if(state.rerolls<=0) return;
+  const keep=new Set(Object.values(state.slots).filter(Boolean).map(c=>c.text));
+  state.hand = state.hand.map(c=>{ const n=drawWord(c.cat, new Set([...keep, ...state.hand.map(h=>h.text)])); keep.add(n.text); return n; });
+  state.rerolls--; selected=null; render();
+};
+$("#auto").onclick=()=>{ autoFill(); render(); };
+$("#newgame").onclick=newGame;
+$("#copy").onclick=async()=>{
+  const text = filled()===7 ? buildPrompt() : sentenceText();
+  try{ await navigator.clipboard.writeText(text); setStatus("명령어를 복사했어요."); }
+  catch{ showTab("prompt"); const r=document.createRange(); r.selectNodeContents($("#v-prompt")); const s=getSelection(); s.removeAllRanges(); s.addRange(r); setStatus("명령어를 선택해 두었어요. Ctrl+C로 복사하세요."); }
+};
+function setStatus(t){ $("#status").textContent=t; }
+
+function showTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected", t.dataset.tab===name));
+  $("#v-play").hidden = name!=="play"; $("#v-code").hidden = name!=="code"; $("#v-prompt").hidden = name!=="prompt";
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
+
+/* ---------- build with Claude ---------- */
+let sample=null, sampleState="pending", busy=false, ctl=null, lastHtml="";
+(async()=>{
+  try{ sample = window.claude ? await window.claude.use("sample") : null; }catch{ sample=null; }
+  sampleState = sample ? "on" : "off";
+  if(!sample){
+    $("#build").textContent="이 화면에선 빌드를 못 해요";
+    setStatus("여기서는 Claude 연결을 쓸 수 없어요. “명령어 복사”로 원하는 바이브 코딩 도구에 붙여넣으세요.");
+  }
+  render();
+})();
+
+function extractHtml(t){
+  const fence=t.match(/```(?:html)?\s*([\s\S]*?)(```|$)/i);
+  let h = fence ? fence[1] : t;
+  const i=h.search(/<!doctype html|<html/i); if(i>0) h=h.slice(i);
+  const j=h.toLowerCase().lastIndexOf("</html>"); if(j>=0) h=h.slice(0,j+7);
+  return h.trim();
+}
+function mountGame(html){
+  const f=document.createElement("iframe");
+  f.setAttribute("sandbox","allow-scripts"); f.title="생성된 게임"; f.srcdoc=html;
+  $("#stage").replaceChildren(f);
+  setTimeout(()=>{ try{ f.focus(); }catch{} },300);
+}
+const ERR = {
+  not_granted:"Claude 사용을 허락하지 않아서 빌드할 수 없어요. 명령어를 복사해서 다른 도구에서 써 보세요.",
+  sampling_disabled:"이 계정에서는 Claude를 부를 수 없어요.",
+  rate_limited:"요청이 너무 많아요. 잠시 뒤에 다시 눌러 주세요.",
+  session_expired:"다시 로그인해야 해요.",
+  refused:"Claude가 이 조합은 만들지 않겠다고 했어요. 카드를 바꿔 보세요.",
+  empty_completion:"빈 답이 왔어요. 다시 눌러 보세요.",
+  upstream_error:"연결이 끊겼어요. 다시 눌러 보세요."
+};
+$("#build").onclick=async()=>{
+  if(busy||!sample||filled()<7) return;
+  busy=true; render();
+  ctl=new AbortController(); $("#stop").hidden=false; $("#restart").hidden=true;
+  showTab("code"); $("#v-code").textContent="생각하는 중…";
+  setStatus("토큰을 Claude에 연결했어요. 아무말을 해석하는 중…");
+  const started=Date.now();
+  try{
+    const {text,truncated}=await sample(buildPrompt(),{
+      signal:ctl.signal, cache:false,
+      onText:({text})=>{ const box=$("#v-code"); box.textContent=text; box.scrollTop=box.scrollHeight;
+        setStatus(`코드 받는 중… 약 ${estTokens(text).toLocaleString()} 토큰`); }
+    });
+    lastHtml=extractHtml(text);
+    mountGame(lastHtml); showTab("play");
+    $("#stageMeta").textContent=`“${words().who}” 게임 · ${Math.round((Date.now()-started)/1000)}초 걸림`;
+    $("#restart").hidden=false;
+    setStatus(truncated ? "코드가 길어서 중간에 잘렸어요. 안 돌아가면 다시 빌드해 보세요." : "빌드 완료. 무대를 클릭하고 플레이하세요.");
+  }catch(e){
+    if(e && e.code==="cancelled") setStatus("멈췄어요.");
+    else{
+      setStatus(ERR[e?.code] || ERR.upstream_error);
+      if(e?.code==="not_granted"||e?.code==="sampling_disabled"){ sampleState="off"; $("#build").textContent="이 화면에선 빌드를 못 해요"; }
+      if(e?.code==="refused") $("#v-code").textContent="";
+    }
+  }finally{
+    busy=false; $("#stop").hidden=true; render();
+  }
+};
+$("#stop").onclick=()=>ctl?.abort();
+$("#restart").onclick=()=>{ if(lastHtml){ mountGame(lastHtml); showTab("play"); } };
+
+/* ---------- remember this viewer's table ---------- */
+function saveLocal(){ try{ localStorage.setItem("amumal-v1", JSON.stringify({state,uid})); }catch{} }
+function loadLocal(){
+  try{ const d=JSON.parse(localStorage.getItem("amumal-v1")||"null");
+    if(d && d.state && d.state.slots && Array.isArray(d.state.hand)){ state=d.state; uid=d.uid||100; return true; } }catch{}
+  return false;
+}
+if(loadLocal()) render(); else newGame();
+</script>
+
+</body>
+</html>
