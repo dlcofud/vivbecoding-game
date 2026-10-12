@@ -93,7 +93,8 @@
   /* parts: Blocks.sentenceParts() */
   function compile(parts){
     const unknown = [], words = {};
-    const slots = Object.fromEntries(parts.filter(p=>p.slot).map(p=>[p.slot.key, p]));
+    const slots = {};
+    for(const p of parts) if(p.slot && p.slot.key && !(p.slot.key in slots)) slots[p.slot.key] = p;   // 같은 카테고리가 두 번 나오면 첫 칸 기준
     const part = key => {
       const p = slots[key]; if(!p || !p.slot.filled) return FALLBACK[key] ? FALLBACK[key](0) : {};
       words[key] = p.text;

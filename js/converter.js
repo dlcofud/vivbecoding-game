@@ -9,6 +9,9 @@
  *
  *   Converter.mount(el)    심사대와 무대를 el 안에 그림
  *   Converter.update()     블록이 바뀔 때 main.js 가 호출
+ *
+ * Blocks 에서 꼭 필요한 것: mount, onChange, isComplete, filledCount, total, sentence, sentenceParts, title
+ * 있으면 더 좋은 것: sentenceParts 의 slot.key/word/cardCat/glue (연결 토큰 규칙), Blocks.refresh()
  */
 (function(){
   const TS = window.TokenSaver, J = window.Judges.JUDGES;
@@ -27,9 +30,21 @@
   }
   function savePrefs(){ try{ localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); }catch{} }
 
+  /* Blocks.sentenceParts() 를 이 파일이 쓰는 모양으로 맞춤.
+     블록 쪽이 key/word/cardCat/glue 를 안 주면 색 토큰으로 카테고리를 찾아 채움 (블록 쪽 구현이 바뀌어도 안 깨지게) */
+  function parts(){
+    const W = window.WORDS || {};
+    const catByColor = c => Object.keys(W).find(k => W[k].color === c);
+    return Blocks.sentenceParts().map(p=>{
+      if(!p.slot) return p;
+      const cat = p.slot.key || catByColor(p.slot.color);
+      const word = p.slot.word ?? (p.slot.filled ? p.text : null);
+      return {...p, slot:{...p.slot, key:cat, word, cardCat:p.slot.cardCat || cat}};
+    });
+  }
   const prompt = () => TS.buildPrompt(prefs.mode, Blocks.sentence(), prefs.judge);
   const cacheKey = () => TS.cache.key(prefs.mode, prefs.tier, prompt());
-  const grammar = () => Grammar.check(Blocks.sentenceParts());
+  const grammar = () => Grammar.check(parts());
   /* 제출 가능: 빈칸·못 들어가는 카드가 없을 때. 연결 토큰 초과는 제출은 되지만 바로 탈락 */
   const blocking = g => g.errors.filter(e=>!e.startsWith("연결 토큰 초과"));
   const overBudget = g => g.glueUsed > g.budget;
@@ -237,9 +252,9 @@
   };
 
   function localJudge(){
-    const parts = Blocks.sentenceParts().filter(p=>p.slot);
-    const words = Object.fromEntries(parts.map(p=>[p.slot.key, p.text]));
-    const glued = parts.filter(p=>p.slot.glue).map(p=>p.slot.word);
+    const ps = parts().filter(p=>p.slot), words = {};
+    for(const p of ps) if(p.slot.key && !(p.slot.key in words)) words[p.slot.key] = p.text;
+    const glued = ps.filter(p=>p.slot.glue).map(p=>p.slot.word);
     return Judges.localVerdict(prefs.judge, {words, glued, glueUsed: glued.length});
   }
 
@@ -248,7 +263,7 @@
     if(busy || !Blocks.isComplete() || blocking(gr).length) return;
     hideVerdict();
     const m = prefs.mode, j = judge();
-    const {cfg: base, unknown} = WordMeta.compile(Blocks.sentenceParts());
+    const {cfg: base, unknown} = WordMeta.compile(parts());
 
     /* Claude를 부르지 않는 경우: 0 토큰 모드, 또는 연결 토큰 초과(어차피 탈락) */
     if(!TS.MODES[m].claude || overBudget(gr)){
@@ -348,7 +363,7 @@
         const b=e.target.closest(".judge"); if(!b || busy || b.dataset.v===prefs.judge) return;
         prefs.judge=b.dataset.v; savePrefs(); hideVerdict();
         Grammar.setBudget(judge().budget);
-        Blocks.refresh();   // 연결 토큰 한도 표시가 바뀜 → onChange 로 update() 도 불림
+        if(Blocks.refresh) Blocks.refresh(); else update();   // 연결 토큰 한도 표시가 바뀜
         setStatus(`${judge().emoji} ${judge().name}로 바꿨어요. ${judge().desc}`);
       };
       q('[data-act="build"]').onclick = ()=>build(false);
