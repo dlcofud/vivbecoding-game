@@ -16,6 +16,7 @@
  *                             text = 연결 토큰까지 붙은 글, word = 카드 원래 글, cardCat = 카드 원래 카테고리
  *   Blocks.guide()            ["주인공 (플레이어가 조종): 매국노", ...]  명령어의 해석 가이드 줄
  *   Blocks.title()            게임 이름으로 쓸 짧은 단어 (주인공)
+ *   Blocks.refresh()          다시 그리기 (심사위원이 바뀌어 연결 토큰 한도가 달라졌을 때)
  */
 (function(){
   const CATS = window.WORDS;
@@ -191,6 +192,7 @@
     sentenceParts,
     sentence(){ return sentenceParts().map(p=>p.slot && !p.slot.filled ? "[ ? ]" : p.text).join(""); },
     guide(){ return ORDER.filter(k=>word(k)).map(k=>`${CATS[k].guide}: ${word(k)}`); },
-    title(){ return word("who") || "아무말 게임"; }
+    title(){ return word("who") || "아무말 게임"; },
+    refresh(){ if(root) render(); }
   };
 })();

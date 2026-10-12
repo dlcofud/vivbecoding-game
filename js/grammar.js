@@ -5,14 +5,14 @@
  *   예) 행동 칸에 "팀장님"(명사)  → "팀장님이 된다"
  *       주인공 칸에 "랩을 한다"(동사) → "랩을 하는 자"
  *       방식 칸에 "붕어빵"(명사)   → "붕어빵처럼"
- * 연결 토큰은 한 판에 BUDGET 개까지만 쓸 수 있고, 넘으면 컴파일(빌드)이 안 됩니다.
+ * 연결 토큰은 한 판에 BUDGET 개까지만 쓸 수 있고, 넘으면 제출이 안 됩니다. 한도는 심사위원마다 달라요(setBudget).
  *
  *   Grammar.fit(slotKey, cardCat, text) → {text, glue, cost}
  *   Grammar.check(parts)                → {ok, errors:[...], glueUsed, budget}
  *   Grammar.typeOf(cat)                 → "N" | "PLACE" | "ADV" | "VERB"
  */
 (function(){
-  const BUDGET = 2;
+  let budget = 2; // 심사위원마다 다름 (setBudget)
   const LABEL = {N:"명사", PLACE:"장소", ADV:"~처럼", VERB:"동사"};
 
   /* 카드가 원래 어느 카테고리에서 왔는지 → 품사. words.js 에 type 을 적으면 그게 우선 */
@@ -70,10 +70,10 @@
     const empty = slots.filter(p=>!p.slot.filled);
     if(empty.length) errors.push(`빈칸 ${empty.length}개: ${empty.map(p=>p.slot.label).join(", ")}`);
     const glued = slots.filter(p=>p.slot.glue);
-    if(glued.length > BUDGET) errors.push(`연결 토큰 초과 (${glued.length}/${BUDGET}): 억지로 이은 곳이 너무 많아요`);
+    if(glued.length > budget) errors.push(`연결 토큰 초과 (${glued.length}/${budget}): 억지로 이은 곳이 너무 많아요`);
     for(const p of slots) if(p.slot.bad) errors.push(`${p.slot.label} 칸: ${p.slot.bad}`);
-    return {ok: errors.length===0, errors, glueUsed: glued.length, budget: BUDGET};
+    return {ok: errors.length===0, errors, glueUsed: glued.length, budget};
   }
 
-  window.Grammar = { BUDGET, LABEL, typeOf, fit, check, accepts:(slot,cat)=>!ACCEPT[slot]||ACCEPT[slot].includes(typeOf(cat)) };
+  window.Grammar = { get BUDGET(){ return budget; }, setBudget(n){ budget = n; }, LABEL, typeOf, fit, check, accepts:(slot,cat)=>!ACCEPT[slot]||ACCEPT[slot].includes(typeOf(cat)) };
 })();

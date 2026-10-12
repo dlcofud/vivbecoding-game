@@ -23,13 +23,33 @@
 .chk i{font-style:normal;font-weight:700;width:1.2em;text-align:center;flex:none}
 .chk.pass i{color:var(--ok)} .chk.fail{color:var(--bad-ink)} .chk.fail i{color:var(--bad-ink)} .chk.info{color:var(--muted)}
 
+/* 심사위원 고르기 */
+.sub{font-size:12.5px;color:var(--muted);letter-spacing:.04em;margin-bottom:-4px}
+.judges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:520px){.judges{grid-template-columns:minmax(0,1fr)}}
+.judge{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:8px;row-gap:2px;align-items:center;text-align:left;
+  background:var(--panel);color:var(--ink);border:1.5px solid var(--line);border-radius:12px;padding:10px}
+.judge:hover{border-color:var(--accent)}
+.judge[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--bg)}
+.j-face{grid-row:1/3;font-size:30px;line-height:1}
+.j-name{font-family:var(--f-block);font-size:16px}
+.j-desc{font-size:11.5px;color:var(--muted);line-height:1.35}
+
+details.more{border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+details.more summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)}
+details.more[open]{display:flex;flex-direction:column;gap:10px}
+
 /* 심사 결과 */
-.verdict{border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;border:1.5px solid}
-.verdict strong{font-family:var(--f-block);font-weight:400;font-size:20px}
-.verdict p{margin:0;font-size:14px}
+.verdict{border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;border:1.5px solid}
+.v-head{display:flex;align-items:center;gap:10px}
+.v-face{font-size:36px;line-height:1}
+.v-head strong{display:block;font-family:var(--f-display);font-weight:400;font-size:24px;line-height:1}
+.v-who{font-size:12.5px;opacity:.85}
+.v-score{margin-left:auto;font-family:var(--f-display);font-weight:400;font-size:28px;font-variant-numeric:tabular-nums}
+.v-comment{margin:0;font-size:15px;line-height:1.65;max-width:62ch}
 .verdict.fail{background:var(--bad-bg);border-color:var(--bad-ink);color:var(--bad-ink)}
 .verdict.pass{background:var(--ok-bg);border-color:var(--ok);color:var(--ink)}
-.verdict.pass strong{color:var(--ok)}
+.verdict.pass strong,.verdict.pass .v-score{color:var(--ok)}
 
 .tokens{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--f-mono);font-size:13px}
 .tok{padding:1px 4px;border-radius:4px;background:var(--tok1)}
