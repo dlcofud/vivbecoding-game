@@ -25,7 +25,10 @@
 | `js/words.js` | 블록 조합 | 카테고리와 단어 카드 목록 |
 | `js/blocks.js` | 블록 조합 | 손패, 블록 모양, 빈칸 채우기, 문장 만들기 |
 | `css/blocks.css` | 블록 조합 | 카드·블록·빈칸 스타일, 카테고리 색 |
-| `js/converter.js` | 토큰 변환기 | 명령어 만들기, 토큰 계산, Claude 빌드, 무대, (다운로드 등 추가 기능) |
+| `js/converter.js` | 토큰 변환기 | 토큰 변환기 화면, Claude 빌드, 무대, 게임 다운로드 |
+| `js/token-saver.js` | 토큰 변환기 | 명령어 문구, 빌드 방식·모델, 토큰 어림, 저장본 재사용, 누적 사용량 |
+| `js/game-template.js` | 토큰 변환기 | 게임 틀(미니 엔진). 절약 모드에서 Claude는 규칙만 씀 |
+| `docs/TOKEN_SAVING.md` | 토큰 변환기 | 토큰 절약 방법과 쓸 수 있는 오픈 소스 정리 |
 | `css/converter.css` | 토큰 변환기 | 토큰 변환기·무대 스타일 |
 | `index.html` | 공용 | 빈 틀. 두 부분이 들어갈 자리(`#workbench`, `#converter`)만 있음 |
 | `js/main.js` | 공용 | 두 부분을 화면에 붙이고 연결 (4줄) |
