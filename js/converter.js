@@ -25,8 +25,8 @@
   const judge = () => J[prefs.judge];
 
   function loadPrefs(){
-    try{ const p=JSON.parse(localStorage.getItem(PREF_KEY)); if(p && TS.MODES[p.mode] && TS.TIERS[p.tier] && J[p.judge]) return p; }catch{}
-    return {mode:"config", tier:"quick", judge:"warm"};
+    try{ const p=JSON.parse(localStorage.getItem(PREF_KEY)); if(p && TS.MODES[p.mode] && TS.TIERS[p.tier] && J[p.judge]) return {sound:true, ...p}; }catch{}
+    return {mode:"config", tier:"quick", judge:"warm", sound:true};
   }
   function savePrefs(){ try{ localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); }catch{} }
 
@@ -43,6 +43,16 @@
     });
   }
   const prompt = () => TS.buildPrompt(prefs.mode, Blocks.sentence(), prefs.judge);
+
+  /* ---------- 효과음 (js/sounds.js, 출처 assets/sounds/CREDITS.md) ---------- */
+  let drum = null;
+  function play(name, loop){
+    if(!prefs.sound || !window.SOUNDS?.[name]) return null;
+    try{ const a=new Audio(SOUNDS[name]); a.loop=!!loop; a.volume=.8; a.play().catch(()=>{}); return a; }catch{ return null; }
+  }
+  const stopDrum = () => { if(drum){ drum.pause(); drum=null; } };
+  const startDrum = () => { stopDrum(); drum = play("drumroll", true); };
+  const wait = ms => new Promise(r=>setTimeout(r, ms));
   const cacheKey = () => TS.cache.key(prefs.mode, prefs.tier, prompt());
   const grammar = () => Grammar.check(parts());
   /* 제출 가능: 빈칸·못 들어가는 카드가 없을 때. 연결 토큰 초과는 제출은 되지만 바로 탈락 */
@@ -62,7 +72,7 @@
 
   const TEMPLATE = `
     <section class="panel" aria-labelledby="h-tok">
-      <div class="ph"><h2 id="h-tok">심사대</h2><span>문장 → 제출 전 점검 → 심사 → 게임</span></div>
+      <div class="ph"><h2 id="h-tok">심사대</h2><button class="btn sound" data-act="sound" aria-pressed="true"></button></div>
       <p class="sentence" data-sentence></p>
       <div class="tokens" data-tokens aria-label="토큰 미리보기"></div>
 
@@ -129,6 +139,8 @@
     }
     const tk=q("[data-tokens]"); tk.innerHTML="";
     tokenize(Blocks.sentence()).forEach(t=>{ const s=document.createElement("span"); s.className="tok"; s.textContent=t; tk.appendChild(s); });
+
+    const sb=q('[data-act="sound"]'); sb.textContent = prefs.sound ? "🔊 소리 켜짐" : "🔇 소리 꺼짐"; sb.setAttribute("aria-pressed", prefs.sound);
 
     /* 심사위원 */
     q("[data-judges]").querySelectorAll(".judge").forEach(b=>b.setAttribute("aria-checked", b.dataset.v===prefs.judge));
@@ -226,13 +238,14 @@
 
   /* 심사 결과 → 게임 */
   function apply(j, v, m, base, costText){
+    stopDrum(); play(j.sfx?.[v.ok ? "pass" : "fail"]);
     showVerdict(j, v);
     if(!v.ok){
       setStatus(`게임이 만들어지지 않았어요. 카드를 바꾸거나, 다른 칸에 넣거나, 다른 심사위원에게 내 보세요. ${costText}`);
       return;
     }
     let html, code;
-    if(m==="config" || m==="zero"){ const cfg = v.config ? WordMeta.merge(base, v.config) : base; html = GameTemplate.wrapConfig(cfg); code = JSON.stringify(cfg, null, 1); }
+    if(m==="config" || m==="zero"){ const cfg = v.config ? WordMeta.merge(base, v.config) : base; html = GameTemplate.wrapConfig(cfg, {muted:!prefs.sound}); code = JSON.stringify(cfg, null, 1); }
     else if(m==="lite"){ code = v.code; html = GameTemplate.wrap(v.code, liteTitle(v.code)); }
     else { code = v.html; html = v.html; }
     showGame(html, code, `“${titleOf(html) || Blocks.title()}” · ${j.name} ${v.score}/10 · ${costText}`);
@@ -268,6 +281,9 @@
     /* Claude를 부르지 않는 경우: 0 토큰 모드, 또는 연결 토큰 초과(어차피 탈락) */
     if(!TS.MODES[m].claude || overBudget(gr)){
       const v = localJudge();
+      busy=true; update(); startDrum(); setStatus(`${j.emoji} ${j.name}이 문장을 읽고 있어요…`);
+      await wait(1400);   // 두구두구
+      busy=false;
       apply(j, v, "zero", base, "0 토큰");
       if(v.ok && unknown.length) setStatus(`통과! 해석표에 없는 단어 ${unknown.length}개(${unknown.join(", ")})는 기본값으로 조립했어요. 0 토큰`);
       return;
@@ -276,13 +292,14 @@
     const tier=prefs.tier, p=prompt(), key=TS.cache.key(m,tier,p);
     const hit = !force && TS.cache.get(key);
     if(hit){
+      busy=true; update(); startDrum(); await wait(900); busy=false;
       TS.usage.addSaved((hit.inTok||0)+(hit.outTok||0));
       apply(j, hit.v, m, base, `저장된 결과라 0 토큰 (약 ${fmt((hit.inTok||0)+(hit.outTok||0))} 토큰 아낌)`);
       update(); return;
     }
     if(!sample) return;
 
-    busy=true; update();
+    busy=true; update(); startDrum();
     const inTok=TS.count(p);
     ctl=new AbortController();
     q('[data-act="stop"]').hidden=false;
@@ -311,7 +328,7 @@
         if(e?.code==="refused") box.textContent="";
       }
     }finally{
-      busy=false; q('[data-act="stop"]').hidden=true; update();
+      busy=false; stopDrum(); q('[data-act="stop"]').hidden=true; update();
     }
   }
 
@@ -373,6 +390,7 @@
       q('[data-act="download"]').onclick = download;
       q('[data-act="restart"]').onclick = ()=>{ if(lastHtml) showGame(lastHtml, q('[data-view="code"]').textContent, q("[data-meta]").textContent); };
       q('[data-act="reset-usage"]').onclick = ()=>{ TS.usage.reset(); update(); };
+      q('[data-act="sound"]').onclick = ()=>{ prefs.sound=!prefs.sound; savePrefs(); if(!prefs.sound) stopDrum(); update(); };
       (async()=>{
         await null; // main.js 가 Blocks 를 다 붙인 뒤에 실행
         const use = name => window.claude ? window.claude.use(name).catch(()=>null) : Promise.resolve(null);

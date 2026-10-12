@@ -10,9 +10,14 @@
  *   Blocks.total()            전체 칸 수
  *   Blocks.isComplete()       다 채웠는지
  *   Blocks.sentence()         완성 문장 (문자열)
- *   Blocks.sentenceParts()    [{text, slot?:{label, color, filled}}]  문장을 색칠해서 보여줄 때 씀
+ *   Blocks.sentenceParts()    [{text, slot?:{id, key, label, color, filled, word, cardCat, glue, bad}}]
+ *                             text = 연결 토큰까지 붙은 글, word = 카드 원래 글, key = 칸의 카테고리, cardCat = 카드의 카테고리
  *   Blocks.guide()            ["주인공 (플레이어가 조종): 매국노", ...]  명령어의 해석 가이드 줄
  *   Blocks.title()            게임 이름으로 쓸 짧은 단어 (주인공)
+ *   Blocks.refresh()          다시 그리기 (심사위원이 바뀌어 연결 토큰 한도가 달라졌을 때)
+ *
+ * [연결 토큰] 카드는 아무 칸에나 놓을 수 있어요. 칸의 품사와 안 맞으면 js/grammar.js 가
+ * "팀장님이 된다", "랩을 하는 자" 처럼 연결 토큰을 붙여 억지로 이어 줍니다. (grammar.js 가 없으면 그대로)
  */
 (function(){
   const CATS = window.WORDS, PRESETS = window.LAYOUTS.presets, PARTS = window.LAYOUTS.parts;
@@ -133,7 +138,7 @@
   }
   function place(cardId, id){
     const card = state.hand.find(c=>c.id===cardId);
-    if(!card || card.cat!==catOf(id)) return;
+    if(!card) return;   // [연결 토큰] 아무 칸에나 놓을 수 있음
     state.hand = state.hand.filter(c=>c!==card);
     if(state.slots[id]) state.hand.push(state.slots[id]);
     state.slots[id] = card;
@@ -149,25 +154,32 @@
     state.hand = state.hand.map(c=>{ const n=drawWord(c.cat, new Set([...keep, ...state.hand.map(h=>h.text)])); keep.add(n.text); return n; });
     state.rerolls--; selected=null; render();
   }
-  const word = k => state.slots[k]?.text || null;
+  /* [연결 토큰] 칸 품사에 맞게 바뀐 글 */
+  function fitted(id){
+    const c = state.slots[id]; if(!c) return null;
+    return window.Grammar ? Grammar.fit(catOf(id), c.cat, c.text) : {text:c.text, glue:null};
+  }
+  const word = k => fitted(k)?.text || null;
 
   /* ---------- 문장 ---------- */
   function sentenceParts(){
     return parse(state.layout.sentence).map(p=>{
       if(p.text!=null) return {text:p.text};
       if(p.j) return {text:josa(p.j, word(p.of))};
-      const i=info(p.slot), w=word(p.slot);
-      return {text:w||i.label, slot:{label:i.label, color:i.color, filled:!!w}};
+      const i=info(p.slot), f=fitted(p.slot), c=state.slots[p.slot];
+      return {text:f?f.text:i.label, slot:{id:p.slot, key:i.cat, label:i.label, color:i.color, filled:!!c,
+        word:c?.text||null, cardCat:c?.cat||null, glue:f?.glue||null, bad:f?.bad||null}};
     });
   }
 
   /* ---------- 그리기 ---------- */
   const TEMPLATE = `
-    <div class="ph"><h2>작업대</h2><span>카드를 누른 뒤 같은 색 칸을 누르세요 (끌어다 놓아도 돼요)</span></div>
+    <div class="ph"><h2>작업대</h2><span>카드는 아무 칸에나 놓을 수 있어요. 품사가 안 맞으면 연결 토큰이 붙어요</span></div>
     <div class="row">
       <button class="btn" data-act="reroll">패 바꾸기 <b data-rerolls>5</b></button>
       <button class="btn" data-act="auto">손패로 자동 채우기</button>
       <button class="btn" data-act="new">새 판</button>
+      <span class="glue-meter" data-glue></span>
     </div>
     <div class="lay">
       <span class="lay-h">블록 구조</span>
@@ -235,18 +247,18 @@
     return b;
   }
   function slotEl(id){
-    const c=state.slots[id], i=info(id), b=document.createElement("button");
+    const c=state.slots[id], i=info(id), f=fitted(id), b=document.createElement("button");
     b.className="slot"+(c?"":" empty"); b.dataset.cat=i.cat;
-    b.style.setProperty("--c", `var(${i.color})`);
+    b.style.setProperty("--c", `var(${c ? CATS[c.cat].color : i.color})`);
     b.innerHTML=`<span class="dot"></span><span></span>`;
     b.lastChild.textContent = c ? c.text : i.label;
-    b.setAttribute("aria-label", `${i.label} 칸: ${c?c.text:"비어 있음"}`);
+    if(f?.glue){ const g=document.createElement("span"); g.className="glue"; g.textContent="+"+f.glue; b.appendChild(g); }   // [연결 토큰]
+    b.setAttribute("aria-label", `${i.label} 칸: ${c ? (f?.text||c.text) : "비어 있음"}`);
     b.onclick=()=>{
-      const sc=state.hand.find(x=>x.id===selected);
-      if(sc && sc.cat===i.cat){ place(selected,id); return; }
+      if(state.hand.some(x=>x.id===selected)){ place(selected,id); return; }
       if(c) unplace(id);
     };
-    b.ondragover=e=>{ const sc=state.hand.find(x=>x.id===selected); if(sc&&sc.cat===i.cat){ e.preventDefault(); b.classList.add("over"); } };
+    b.ondragover=e=>{ if(state.hand.some(x=>x.id===selected)){ e.preventDefault(); b.classList.add("over"); } };
     b.ondragleave=()=>b.classList.remove("over");
     b.ondrop=e=>{ e.preventDefault(); place(e.dataTransfer.getData("text/plain")||selected, id); };
     return b;
@@ -259,13 +271,21 @@
     root.querySelectorAll("[data-slot]").forEach(h=>h.replaceChildren(slotEl(h.dataset.slot)));
     root.querySelectorAll("[data-j]").forEach(h=>{ h.textContent = josa(h.dataset.j, word(h.dataset.of)); });
     q("[data-rerolls]").textContent=state.rerolls;
+    if(window.Grammar){   // [연결 토큰] 사용량 / 한도
+      const used = ids().filter(k=>fitted(k)?.glue).length, el=q("[data-glue]");
+      el.textContent=`연결 토큰 ${used}/${Grammar.BUDGET}`; el.classList.toggle("over", used>Grammar.BUDGET);
+    }
     q('[data-act="reroll"]').disabled = state.rerolls<=0 || !state.hand.length;
     highlight(); save();
     listeners.forEach(fn=>fn());
   }
   function highlight(){
     const sc = state.hand.find(x=>x.id===selected);
-    root.querySelectorAll(".slot").forEach(s=>s.classList.toggle("target", !!sc && sc.cat===s.dataset.cat));
+    root.querySelectorAll(".slot").forEach(s=>{   // [연결 토큰] 맞는 칸은 진하게, 연결 토큰이 드는 칸은 노랗게
+      const fits = sc && (!window.Grammar || Grammar.accepts(s.dataset.cat, sc.cat));
+      s.classList.toggle("target", !!sc && fits);
+      s.classList.toggle("target-glue", !!sc && !fits);
+    });
   }
 
   /* ---------- 이 브라우저에 판 기억 ---------- */
@@ -298,6 +318,7 @@
     sentenceParts,
     sentence(){ return sentenceParts().map(p=>p.slot && !p.slot.filled ? "[ ? ]" : p.text).join(""); },
     guide(){ return [`게임 구조 (${state.layout.name}): ${state.layout.guide}`, ...ids().filter(k=>word(k)).map(k=>`${info(k).guide}: ${word(k)}`)]; },
-    title(){ return word("who") || "아무말 게임"; }
+    title(){ return word("who") || "아무말 게임"; },
+    refresh(){ if(root) render(); }
   };
 })();

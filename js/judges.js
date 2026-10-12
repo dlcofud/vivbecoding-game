@@ -3,7 +3,8 @@
  * 디자인 회사에서 신입에게 "까다로운 클라이언트", "뭐든 좋다는 클라이언트" 같은 역할을 정해 두고
  * 로고를 그려 오게 하듯, 같은 문장도 누가 심사하느냐에 따라 결과와 멘트가 달라집니다.
  *
- *   JUDGES[id] = {name, emoji, desc, budget, persona, local}
+ *   JUDGES[id] = {name, emoji, desc, budget, sfx:{pass,fail}, persona, local}
+ *     sfx      통과·탈락 때 나는 소리 (js/sounds.js 이름)
  *     budget   연결 토큰 한도 (grammar.js 에 넘김)
  *     persona  Claude에게 주는 성격 설명 (영어가 토큰이 적게 들어서 영어)
  *     local    0 토큰 모드에서 쓰는 미리 써 둔 멘트와 점수 규칙
@@ -17,7 +18,7 @@
 
   const JUDGES = {
     warm: {
-      name:"다정한 심사위원", emoji:"🥰", budget:3,
+      name:"다정한 심사위원", emoji:"🥰", budget:3, sfx:{pass:"airhorn", fail:"trombone"},
       desc:"웬만하면 통과. 칭찬을 아끼지 않아요. 연결 토큰 3개까지.",
       persona:`You are the WARM judge: generous and encouraging. Pass unless nothing at all connects. Praise specific word choices, find hidden meaning in forced connectors, end with one gentle tip. Score 6-10 when passing.`,
       local:{
@@ -35,7 +36,7 @@
       }
     },
     strict: {
-      name:"깐깐한 심사위원", emoji:"🧐", budget:1,
+      name:"깐깐한 심사위원", emoji:"🧐", budget:1, sfx:{pass:"ding", fail:"buzzer"},
       desc:"억지 연결을 싫어해요. 조금만 어색해도 탈락. 연결 토큰 1개까지.",
       persona:`You are the STRICT judge: demanding, dry, sarcastic but never cruel. Pass only if every part clearly drives one playable mechanic. Nitpick each forced connector and weak link by quoting it. Score 1-7 even when passing; 8+ is legendary.`,
       local:{
@@ -54,7 +55,7 @@
       }
     },
     bored: {
-      name:"관심 없는 심사위원", emoji:"🥱", budget:2,
+      name:"관심 없는 심사위원", emoji:"🥱", budget:2, sfx:{pass:"rimshot", fail:"scratch"},
       desc:"사실 심사에 별 관심이 없어요. 기분 따라 통과. 연결 토큰 2개까지.",
       persona:`You are the BORED judge: you barely read it. Mostly pass, but fail on a whim for an unrelated reason (lunch, your phone, the weather). Ramble about something off-topic, mention one random word from the sentence as if skimming. Score is arbitrary 1-10.`,
       local:{

@@ -65,7 +65,9 @@
 
   /* parts: Blocks.sentenceParts() 결과 */
   function check(parts){
-    const slots = parts.filter(p=>p.slot);
+    // 같은 칸이 문장에 여러 번 나와도 한 번만 셈 (slot.id 가 없으면 나온 순서대로 따로 셈)
+    const seen = new Set();
+    const slots = parts.filter(p=>p.slot).filter((p,i)=>{ const k = p.slot.id || "#"+i; if(seen.has(k)) return false; seen.add(k); return true; });
     const errors = [];
     const empty = slots.filter(p=>!p.slot.filled);
     if(empty.length) errors.push(`빈칸 ${empty.length}개: ${empty.map(p=>p.slot.label).join(", ")}`);

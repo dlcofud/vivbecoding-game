@@ -108,6 +108,7 @@ draw(ctx,s,E){for(const f of s.foes)E.emoji(ctx,"🐟",f.x,f.y,40);for(const b o
    *
    * CFG = {title, unit, hint, actLabel, player, size, hazard, shot, ambient, bg:[색,색],
    *        move, action, pattern, effect, speed}
+   * wrapConfig(cfg, {muted}) 가 js/sounds.js 에서 필요한 효과음만 골라 sfx 로 넣어 줍니다. 게임 안에서 M 키로 음소거.
    * 고를 수 있는 값은 아래 OPTIONS.
    * 이 함수는 toString()으로 게임 HTML 안에 그대로 들어가니, 바깥 변수를 쓰면 안 됩니다.
    * ------------------------------------------------------------------ */
@@ -131,7 +132,10 @@ draw(ctx,s,E){for(const f of s.foes)E.emoji(ctx,"🐟",f.x,f.y,40);for(const b o
     const TIMER={flip:"뒤집힘",fast:"빨라짐",slow:"느려짐",pink:"분홍",rain:"비",freeze:"멈춤",slowmo:"슬로모션",shield:"방패",hop:"공중"};
     const CD={shoot:.25,wave:1.2,hop:.9,teleport:1,freeze:4,shield:5,convert:.8,slowmo:5};
     const keys={l:0,r:0,u:0,d:0}, TOP=64;
-    let g, ptr=null;
+    let g, ptr=null, muted=!!C.muted;
+    /* 효과음: C.sfx = {이름: data URI}. 브라우저 규칙상 첫 클릭·키 입력 뒤부터 소리가 나요 */
+    const sfx=n=>{ if(muted||!C.sfx||!C.sfx[n]) return; try{ const a=new Audio(C.sfx[n]); a.volume=.7; a.play().catch(()=>{}); }catch(e){} };
+    const BIG={grow:1,split:1,flip:1,fast:1,pink:1,reset:1,halve:1,rain:1,fly:1};
 
     function reset(){
       const r=22*(C.size||1);
@@ -144,6 +148,7 @@ draw(ctx,s,E){for(const f of s.foes)E.emoji(ctx,"🐟",f.x,f.y,40);for(const b o
     addEventListener("keydown",e=>{
       if(km[e.code]){ keys[km[e.code]]=1; e.preventDefault(); }
       if(e.code==="Space"||e.code==="Enter"){ e.preventDefault(); if(e.repeat) return; g.over?reset():act(); }
+      if(e.code==="KeyM") muted=!muted;
     });
     addEventListener("keyup",e=>{ if(km[e.code]) keys[km[e.code]]=0; });
     const btn=()=>({x:W-58,y:H-58,r:40});
@@ -187,6 +192,7 @@ draw(ctx,s,E){for(const f of s.foes)E.emoji(ctx,"🐟",f.x,f.y,40);for(const b o
         default: if(C.effect in g.tm) g.tm[C.effect]= {flip:5,fast:6,slow:4,pink:6,rain:6}[C.effect]||5;
       }
       g.banner=EFFECT[C.effect]||""; g.bannerT=1.8;
+      sfx(C.effect==="hearts"?"woah":C.effect==="fart"?"fart":BIG[C.effect]?"boom":"");
     }
     function spawnOne(){
       const sp=(140+g.t*3)*(C.speed||1), add=o=>g.hz.push(Object.assign({r:20,life:12,vx:0,vy:0},o));
@@ -234,8 +240,8 @@ draw(ctx,s,E){for(const f of s.foes)E.emoji(ctx,"🐟",f.x,f.y,40);for(const b o
         if(!h.dead && Math.hypot(h.x-p.x,h.y-p.y)<h.r+p.r*.8){
           if(g.tm.shield>0){ kill(h,5); }
           else if(!safe){
-            h.dead=1; g.lives--; g.inv=1.2; g.shake=.35; fx("💥",p.x,p.y,34); effect();
-            if(g.lives<=0) g.over=true;
+            h.dead=1; g.lives--; g.inv=1.2; g.shake=.35; fx("💥",p.x,p.y,34); sfx("bonk"); effect();
+            if(g.lives<=0){ g.over=true; sfx("dundun"); }
           }
         }
       }
@@ -273,7 +279,7 @@ draw(ctx,s,E){for(const f of s.foes)E.emoji(ctx,"🐟",f.x,f.y,40);for(const b o
       text(C.title||"아무말 게임",12,18,17,"#fff","left");
       text(C.hint||"방향키·드래그 이동 · 스페이스 행동",12,40,12,"#ddd","left");
       text(Math.floor(g.score).toLocaleString()+" "+(C.unit||"점"),W-12,18,20,"#ffd84a","right");
-      text("❤️".repeat(Math.max(0,g.lives)),W-12,41,13,"#fff","right");
+      text("❤️".repeat(Math.max(0,g.lives))+(C.sfx?(muted?"  🔇M":"  🔊M"):""),W-12,41,13,"#fff","right");
       const on=Object.keys(TIMER).filter(k=>g.tm[k]>0).map(k=>TIMER[k]+" "+g.tm[k].toFixed(1)).join(" · ");
       if(on) text(on,W/2,70,13,"#fff");
       if(g.bannerT>0){ ctx.globalAlpha=Math.min(1,g.bannerT); text(g.banner,W/2,H*.3,26,"#fff"); ctx.globalAlpha=1; }
@@ -292,8 +298,16 @@ draw(ctx,s,E){for(const f of s.foes)E.emoji(ctx,"🐟",f.x,f.y,40);for(const b o
     (function frame(now){ const dt=Math.min(.05,(now-last)/1000); last=now; if(!g.over) update(dt); draw(); requestAnimationFrame(frame); })(last);
   }
 
-  function wrapConfig(cfg){
-    const json = JSON.stringify(cfg).replace(/</g, "\\u003c");
+  /* 이 설정에 필요한 소리만 골라 넣음 (게임 파일이 너무 커지지 않게) */
+  function soundsFor(cfg){
+    const S = window.SOUNDS; if(!S) return null;
+    const names = ["bonk","dundun", cfg.effect==="hearts"?"woah": cfg.effect==="fart"?"fart":"boom"];
+    const out = {}; for(const n of names) if(S[n]) out[n]=S[n];
+    return out;
+  }
+  function wrapConfig(cfg, opts){
+    const full = Object.assign({}, cfg, {sfx: soundsFor(cfg), muted: !!(opts && opts.muted)});
+    const json = JSON.stringify(full).replace(/</g, "\\u003c");
     return `<!doctype html>
 <html lang="ko">
 <head>

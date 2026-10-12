@@ -3,6 +3,7 @@
   --stage:#0F1220;
   --tok1:#E3E8FF; --tok2:#FFE6D6; --tok3:#DDF4E8; --tok4:#F8E0F0;
   --ok:#1F8A4C; --ok-bg:#E6F6EC; --bad-ink:#C02E2E; --bad-bg:#FDECEC; --glue-bg:#FFF3C4;
+  --glue:#FFE08A; --glue-ink:#5A4300;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --stage:#090B13; --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A;
@@ -17,11 +18,19 @@
 .sentence .gap{color:var(--muted);border-bottom:3px dotted var(--muted)}
 .sentence .glued{border-bottom-style:dashed;background:var(--glue-bg)}
 
+/* 연결 토큰 (작업대 칸에 붙는 표시. 규칙은 js/grammar.js) */
+.glue{font-family:var(--f-body);font-size:12px;font-weight:600;color:var(--glue-ink);background:var(--glue);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.glue-meter{align-self:center;font-size:13px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.glue-meter.over{color:var(--bad-ink)}
+.slot.target-glue{box-shadow:0 0 0 3px rgba(255,255,255,.85),0 0 0 5px var(--glue)}
+
 /* 컴파일 검사 */
 .checks{display:flex;flex-direction:column;gap:4px;font-size:13.5px}
 .chk{display:flex;gap:8px;align-items:flex-start}
 .chk i{font-style:normal;font-weight:700;width:1.2em;text-align:center;flex:none}
 .chk.pass i{color:var(--ok)} .chk.fail{color:var(--bad-ink)} .chk.fail i{color:var(--bad-ink)} .chk.info{color:var(--muted)}
+
+.btn.sound{padding:5px 12px;font-size:13px}
 
 /* 심사위원 고르기 */
 .sub{font-size:12.5px;color:var(--muted);letter-spacing:.04em;margin-bottom:-4px}
