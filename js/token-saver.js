@@ -1,91 +1,93 @@
-/* 토큰 변환기 담당: 토큰 절약 장치
+/* 토큰 변환기 담당: 토큰 절약 장치 + 심사 명령어
  *
- * Claude 사용량은 "보내는 글(입력 토큰)"과 "받는 코드(출력 토큰)"로 나뉩니다.
- * 이 게임에서는 받는 코드가 훨씬 길어서, 출력 토큰을 줄이는 게 가장 효과가 큽니다.
- * 자세한 설명은 docs/TOKEN_SAVING.md
+ * Claude 사용량은 "보내는 글(입력 토큰)"과 "받는 답(출력 토큰)"으로 나뉩니다.
+ * 받는 답이 훨씬 길어서, 답을 줄이는 게 가장 효과가 큽니다. 자세한 설명은 docs/TOKEN_SAVING.md
  *
- *   TokenSaver.MODES          빌드 방식(lite: 틀 사용 / full: 전체 HTML)
- *   TokenSaver.TIERS          모델 등급(quick / default)
- *   TokenSaver.buildPrompt(mode, sentence, guideLines)
- *   TokenSaver.extract(mode, answerText, title)   Claude 답 → 실행할 HTML
- *   TokenSaver.count(text)    토큰 수 어림 (setCounter 로 다른 토크나이저 연결 가능)
- *   TokenSaver.cache          같은 조합이면 저장된 결과 재사용 (Claude 호출 0회)
- *   TokenSaver.usage          이 브라우저에서 쓴 토큰 누적 (어림값)
+ * 빌드 방식 (위에서 아래로 갈수록 비쌈)
+ *   zero   0 토큰     Claude 없이 단어 해석표(word-meta.js)로 조립. 문법 검사만 함
+ *   config 설정만     Claude가 심사 + 게임 설정 JSON 몇 줄만 씀 (엔진은 game-template.js)
+ *   lite   규칙 코드  Claude가 심사 + GAME 규칙 코드
+ *   full   전체 코드  Claude가 심사 + HTML 전체
+ * 모든 Claude 모드는 먼저 심사합니다. 말이 안 이어지면 짧은 거절 이유만 받으니 그 자체로 토큰이 적게 듭니다.
+ *
+ *   TokenSaver.MODES / TIERS
+ *   TokenSaver.buildPrompt(mode, sentence)
+ *   TokenSaver.verdict(mode, answer)  → {ok:false, why} | {ok:true, ...}
+ *   TokenSaver.count(text)            토큰 수 어림 (setCounter 로 바꿀 수 있음)
+ *   TokenSaver.cache / usage
  */
 (function(){
-  /* ---------- 토큰 세기 ----------
-   * 기본은 어림 계산: 한글 한 글자 ≈ 0.9 토큰, 그 밖의 글자 약 3.6자 ≈ 1 토큰.
-   * Claude 토크나이저는 브라우저용으로 공개돼 있지 않아서 정확한 값은 Anthropic count_tokens API로만 알 수 있어요.
-   * 다른 토크나이저를 쓰려면: TokenSaver.setCounter(text => 숫자)
-   */
   let counter = function(s){
     let h=0,a=0; for(const ch of s){ const c=ch.charCodeAt(0); if(c>=0xAC00&&c<=0xD7A3) h++; else a++; }
     return Math.round(h*0.9 + a/3.6);
   };
 
-  /* ---------- 빌드 방식 ----------
-   * expectOut: 받는 코드의 대략적인 토큰 수 (화면 표시용 어림값)
-   */
   const MODES = {
-    lite: {label:"절약 (틀 사용)", desc:"게임 틀은 미리 있고, Claude는 게임 규칙만 씁니다.", expectOut:[900, 1800]},
-    full: {label:"전체 생성", desc:"Claude가 HTML 전체를 처음부터 씁니다. 자유롭지만 비쌉니다.", expectOut:[3500, 6500]}
+    zero:   {label:"0 토큰", claude:false, desc:"Claude를 부르지 않고 단어 해석표로 바로 조립해요. 문법 검사만 하고 의미 심사는 없어요.", expectOut:[0,0]},
+    config: {label:"설정만", claude:true, desc:"Claude가 심사하고, 통과하면 게임 설정 몇 줄만 써요. 엔진은 미리 있어요.", expectOut:[60,160]},
+    lite:   {label:"규칙 코드", claude:true, desc:"Claude가 심사하고 게임 규칙 코드를 써요. 틀이 나머지를 처리해요.", expectOut:[900,1800]},
+    full:   {label:"전체 코드", claude:true, desc:"Claude가 심사하고 HTML 전체를 처음부터 써요. 가장 비싸요.", expectOut:[3500,6500]}
   };
   const TIERS = {
-    quick:   {label:"빠른 모델", desc:"가볍고 빠름. 사용량이 가장 적어요."},
+    quick:   {label:"빠른 모델", desc:"사용량이 가장 적어요."},
     default: {label:"기본 모델", desc:"더 꼼꼼하지만 사용량이 더 들어요."}
   };
 
-  function buildPrompt(mode, sentence, guideLines){
-    const guide = guideLines.map(l=>"- "+l).join("\n");
-    if(mode === "lite"){
-      return `아무말 명령을 진지하게 해석해 미니게임 규칙을 짜라.
-명령: "${sentence}"
-${guide}
+  /* 같은 뜻이면 영어가 한국어보다 토큰이 적어서 지시문은 영어로 씁니다. 화면 글자만 한국어로 받아요. */
+  const JUDGE = `You are a strict judge in a nonsense word-card game (like a "make-a-proposal-from-random-words" game). Players glue random cards into one sentence.
+Pass only if hero, place, motion, obstacle, result and score unit hang together as ONE playable game idea. Absurd is fine; disconnected or forced is not. Reward clever reinterpretation.`;
 
-캔버스·루프·입력·HUD·게임오버·다시하기는 틀에 이미 있다. 너는 GAME 객체만 쓴다.
+  function buildPrompt(mode, sentence){
+    const s = `"${sentence}"`;
+    const O = GameTemplate.OPTIONS;
+    if(mode === "config") return `${JUDGE}
+${s}
+Reply JSON only.
+Fail: {"ok":false,"why":"<Korean ≤40 chars, witty>"}
+Pass: {"ok":true,"score":<1-10 creativity>,"title":"<Korean ≤14>","actLabel":"<Korean ≤8, what Space does>","player":"<emoji>","hazard":"<emoji>","shot":"<emoji>","ambient":"<emoji>","bg":["#hex","#hex"],"move":"${O.move.join("|")}","action":"${O.action.join("|")}","pattern":"${O.pattern.join("|")}","effect":"${O.effect.join("|")}","speed":<0.6-1.8>}`;
+
+    const reject = `If it fails, reply only: REJECT: <Korean reason ≤40 chars>`;
+    if(mode === "lite") return `${JUDGE}
+${s}
+${reject}
+If it passes, write the game. Engine already handles canvas, loop, input, HUD, game over. Write only:
 ${GameTemplate.API}
+Emoji/shapes only, no external/DOM/alert, ≤80 lines, no comments, Korean title/hint, unit from the sentence. Reply one \`\`\`js block only.`;
 
-규칙: 그래픽은 이모지와 도형. 외부 리소스·DOM 조작·alert 금지. 100줄 이내, 주석 없이 짧게. title·hint는 한국어.
-답은 \`\`\`js 코드 블록 하나만.`;
-    }
-    return `너는 바이브 코딩 엔진이다. 아래의 말도 안 되는 명령을 최대한 진지하게 해석해서, 실제로 플레이할 수 있는 브라우저 미니게임으로 만들어라.
-
-명령: "${sentence}"
-
-해석 가이드
-${guide}
-
-만들기 규칙
-- 완전한 HTML 문서 하나. <!doctype html>부터 </html>까지.
-- 외부 리소스 금지: 이미지 파일, 웹폰트, CDN 스크립트를 쓰지 마라. 그래픽은 canvas 도형과 이모지, 텍스트로 그려라.
-- 키보드(방향키, 스페이스)와 터치/클릭을 모두 지원하라.
-- 상단에 게임 제목, 점수, 한 줄 조작법. 게임 오버 화면과 다시하기 버튼은 canvas나 DOM 안에서 처리하라.
-- 창 크기에 맞춰 canvas를 꽉 채우고, body 여백 0, 스크롤 없음.
-- alert/confirm/prompt, localStorage, fetch 사용 금지.
-- 화면에 보이는 글자는 모두 한국어. 코드는 250줄 안팎, 주석 없이.
-- 답은 \`\`\`html 코드 블록 하나만. 앞뒤 설명 없이.`;
+    return `${JUDGE}
+${s}
+${reject}
+If it passes, write one complete HTML file (<!doctype html>…</html>) for that game: canvas fills window, body margin 0, no scroll; keyboard (arrows, space) and touch; title, score with the sentence's unit, one-line controls, in-canvas game over and restart; no external resources, alert, localStorage, fetch; emoji/shapes for art; Korean on-screen text; ≤200 lines, no comments. Reply one \`\`\`html block only.`;
   }
 
   function fenceBody(t){
     const m = t.match(/```[a-zA-Z]*\s*([\s\S]*?)(```|$)/);
     return (m ? m[1] : t).trim();
   }
-  function extract(mode, text, title){
-    if(mode === "lite") return GameTemplate.wrap(fenceBody(text), title);
-    let h = fenceBody(text);
+  /* Claude 답 → 심사 결과 */
+  function verdict(mode, answer){
+    if(mode === "config"){
+      if(!answer || typeof answer !== "object") return {ok:false, why:"심사 결과를 읽지 못했어요. 다시 눌러 보세요."};
+      if(answer.ok !== true) return {ok:false, why: String(answer.why || "말이 안 이어진대요.").slice(0,80)};
+      return {ok:true, score: Math.max(1, Math.min(10, Math.round(Number(answer.score)||5))), config: answer};
+    }
+    const t = String(answer).trim();
+    const rej = t.match(/^\s*REJECT\s*[:：]\s*([\s\S]*)/i);
+    if(rej) return {ok:false, why: rej[1].trim().slice(0,80) || "말이 안 이어진대요."};
+    if(mode === "lite") return {ok:true, code: fenceBody(t)};
+    let h = fenceBody(t);
     const i=h.search(/<!doctype html|<html/i); if(i>0) h=h.slice(i);
     const j=h.toLowerCase().lastIndexOf("</html>"); if(j>=0) h=h.slice(0,j+7);
-    return h.trim();
+    return {ok:true, html: h.trim()};
   }
 
   /* ---------- 저장소 (이 브라우저에만) ---------- */
   const read = (k, d) => { try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } };
   const write = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch{ return false; } };
-
   function hash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0).toString(36); }
 
-  /* 같은 문장·방식·모델이면 저장된 게임을 다시 씀 → Claude 호출 없음 */
-  const CACHE_KEY = "amumal-build-cache-v1", CACHE_MAX = 12;
+  /* 같은 문장·방식·모델이면 저장된 결과(통과든 거절이든)를 다시 씀 → Claude 호출 없음 */
+  const CACHE_KEY = "amumal-build-cache-v2", CACHE_MAX = 20;
   const cache = {
     key(mode, tier, prompt){ return hash(mode+"|"+tier+"|"+prompt); },
     get(k){ return read(CACHE_KEY, {})[k] || null; },
@@ -94,13 +96,11 @@ ${guide}
       all[k] = {...entry, at: Date.now()};
       const keys = Object.keys(all).sort((a,b)=>all[b].at-all[a].at);
       for(const old of keys.slice(CACHE_MAX)) delete all[old];
-      if(!write(CACHE_KEY, all)){ write(CACHE_KEY, {[k]: all[k]}); } // 저장 공간이 꽉 차면 최신 것만
+      if(!write(CACHE_KEY, all)) write(CACHE_KEY, {[k]: all[k]});
     },
-    size(){ return Object.keys(read(CACHE_KEY, {})).length; },
     clear(){ write(CACHE_KEY, {}); }
   };
 
-  /* 이 브라우저에서 쓴 토큰 누적 (어림값) */
   const USAGE_KEY = "amumal-usage-v1";
   const usage = {
     get(){ return read(USAGE_KEY, {builds:0, input:0, output:0, saved:0}); },
@@ -110,7 +110,7 @@ ${guide}
   };
 
   window.TokenSaver = {
-    MODES, TIERS, buildPrompt, extract, cache, usage,
+    MODES, TIERS, buildPrompt, verdict, cache, usage,
     count: s => counter(s),
     setCounter(fn){ counter = fn; }
   };

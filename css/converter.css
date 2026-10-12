@@ -2,16 +2,35 @@
 :root{
   --stage:#0F1220;
   --tok1:#E3E8FF; --tok2:#FFE6D6; --tok3:#DDF4E8; --tok4:#F8E0F0;
+  --ok:#1F8A4C; --ok-bg:#E6F6EC; --bad-ink:#C02E2E; --bad-bg:#FDECEC; --glue-bg:#FFF3C4;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --stage:#090B13; --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A}}
+  --stage:#090B13; --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A;
+  --ok:#4CD487; --ok-bg:#16301F; --bad-ink:#FF8A8A; --bad-bg:#3A1717; --glue-bg:#3D3416}}
 :root[data-theme="dark"]{
-  --stage:#090B13; --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A}
+  --stage:#090B13; --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A;
+  --ok:#4CD487; --ok-bg:#16301F; --bad-ink:#FF8A8A; --bad-bg:#3A1717; --glue-bg:#3D3416}
 
 /* 토큰 변환기 */
 .sentence{font-family:var(--f-block);font-size:clamp(20px,2.6vw,26px);line-height:1.45;margin:0;text-wrap:balance}
 .sentence .w{border-bottom:3px solid var(--c);padding-inline:1px}
 .sentence .gap{color:var(--muted);border-bottom:3px dotted var(--muted)}
+.sentence .glued{border-bottom-style:dashed;background:var(--glue-bg)}
+
+/* 컴파일 검사 */
+.checks{display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.chk{display:flex;gap:8px;align-items:flex-start}
+.chk i{font-style:normal;font-weight:700;width:1.2em;text-align:center;flex:none}
+.chk.pass i{color:var(--ok)} .chk.fail{color:var(--bad-ink)} .chk.fail i{color:var(--bad-ink)} .chk.info{color:var(--muted)}
+
+/* 심사 결과 */
+.verdict{border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;border:1.5px solid}
+.verdict strong{font-family:var(--f-block);font-weight:400;font-size:20px}
+.verdict p{margin:0;font-size:14px}
+.verdict.fail{background:var(--bad-bg);border-color:var(--bad-ink);color:var(--bad-ink)}
+.verdict.pass{background:var(--ok-bg);border-color:var(--ok);color:var(--ink)}
+.verdict.pass strong{color:var(--ok)}
+
 .tokens{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--f-mono);font-size:13px}
 .tok{padding:1px 4px;border-radius:4px;background:var(--tok1)}
 .tok:nth-child(4n+2){background:var(--tok2)}.tok:nth-child(4n+3){background:var(--tok3)}.tok:nth-child(4n+4){background:var(--tok4)}

@@ -1,22 +1,26 @@
 /* 블록 코딩 조합 담당: 손패, 블록 스크립트, 빈칸 채우기, 문장 만들기
  *
+ * 게임 규칙: 카드는 아무 칸에나 놓을 수 있어요. 품사가 안 맞으면
+ * js/grammar.js 가 연결 토큰을 붙여 억지로 이어 주고, 연결 토큰은 한 판에 몇 개까지만 됩니다.
+ * 손패는 칸에 맞춰 나눠 주지 않고 무작위로 뽑으니, 있는 카드로 어떻게든 말이 되게 만드는 게 재미입니다.
+ *
  * 토큰 변환기(converter.js)는 아래 window.Blocks 의 함수만 씁니다.
- * 이 함수들의 이름과 돌려주는 모양만 지키면, 블록 모양·카테고리·규칙은 마음대로 바꿔도 됩니다.
  *
  *   Blocks.mount(el)          작업대를 el 안에 그림
  *   Blocks.onChange(fn)       카드가 움직일 때마다 fn() 호출
  *   Blocks.filledCount()      채운 칸 수
  *   Blocks.total()            전체 칸 수
  *   Blocks.isComplete()       다 채웠는지
- *   Blocks.sentence()         완성 문장 (문자열)
- *   Blocks.sentenceParts()    [{text, slot?:{label, color, filled}}]  문장을 색칠해서 보여줄 때 씀
+ *   Blocks.sentence()         완성 문장 (문자열, 연결 토큰 포함)
+ *   Blocks.sentenceParts()    [{text, slot?:{key, label, color, filled, word, cardCat, glue, bad}}]
+ *                             text = 연결 토큰까지 붙은 글, word = 카드 원래 글, cardCat = 카드 원래 카테고리
  *   Blocks.guide()            ["주인공 (플레이어가 조종): 매국노", ...]  명령어의 해석 가이드 줄
  *   Blocks.title()            게임 이름으로 쓸 짧은 단어 (주인공)
  */
 (function(){
   const CATS = window.WORDS;
   const ORDER = Object.keys(CATS);
-  const PER_CAT = 2, REROLLS = 3, STORE = "amumal-blocks-v1";
+  const HAND = 9, REROLLS = 3, STORE = "amumal-blocks-v2";
 
   let uid = 0, state, selected = null, root = null;
   const listeners = [];
@@ -28,68 +32,70 @@
   const iGa = w => jong(w) ? "이" : "가";
   const euro = w => { const j=jong(w); return (j===0||j===8) ? "로" : "으로"; };
 
+  /* ---------- 연결 토큰 (grammar.js 가 없으면 그대로) ---------- */
+  function fitted(k){
+    const c = state.slots[k]; if(!c) return null;
+    return window.Grammar ? Grammar.fit(k, c.cat, c.text) : {text:c.text, glue:null, cost:0};
+  }
+  const word = k => fitted(k)?.text || null;
+
   /* ---------- 상태 ---------- */
   function inPlay(){ return new Set([...state.hand.map(c=>c.text), ...Object.values(state.slots).filter(Boolean).map(c=>c.text)]); }
-  function drawWord(cat, exclude){
-    const pool = CATS[cat].words.filter(w => !exclude.has(w));
-    return {id:"c"+(++uid), cat, text: rnd(pool.length?pool:CATS[cat].words), r:(Math.random()*5-2.5).toFixed(1)};
+  /* 무작위 카드 한 장. 카테고리도 무작위라 칸에 딱 맞는 카드가 안 올 수도 있어요 */
+  function drawCard(exclude){
+    for(let i=0;i<20;i++){
+      const cat = rnd(ORDER), text = rnd(CATS[cat].words);
+      if(!exclude.has(text)) return {id:"c"+(++uid), cat, text, r:(Math.random()*5-2.5).toFixed(1)};
+    }
+    const cat = rnd(ORDER); return {id:"c"+(++uid), cat, text:rnd(CATS[cat].words), r:"0"};
   }
-  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} }
   function newGame(){
     state = {hand:[], slots:Object.fromEntries(ORDER.map(k=>[k,null])), rerolls:REROLLS};
-    for(const cat of ORDER) for(let i=0;i<PER_CAT;i++) state.hand.push(drawWord(cat, inPlay()));
-    shuffle(state.hand);
-    autoFill();
+    for(let i=0;i<HAND;i++) state.hand.push(drawCard(inPlay()));
     selected = null; render();
   }
-  function autoFill(){
-    for(const cat of ORDER){
-      if(state.slots[cat]) continue;
-      const opts = state.hand.filter(c=>c.cat===cat);
-      if(!opts.length) continue;
-      const pick = rnd(opts);
-      state.hand = state.hand.filter(c=>c!==pick);
-      state.slots[cat] = pick;
-    }
-  }
-  function place(cardId, cat){
+  function place(cardId, slot){
     const card = state.hand.find(c=>c.id===cardId);
-    if(!card || card.cat!==cat) return;
+    if(!card) return;
     state.hand = state.hand.filter(c=>c!==card);
-    if(state.slots[cat]) state.hand.push(state.slots[cat]);
-    state.slots[cat] = card;
+    if(state.slots[slot]) state.hand.push(state.slots[slot]);
+    state.slots[slot] = card;
     selected = null; render();
   }
-  function unplace(cat){
-    const c = state.slots[cat]; if(!c) return;
-    state.slots[cat] = null; state.hand.push(c); selected = null; render();
+  function unplace(slot){
+    const c = state.slots[slot]; if(!c) return;
+    state.slots[slot] = null; state.hand.push(c); selected = null; render();
   }
+  /* 칸에 놓이지 않은 손패를 전부 새로 뽑음 */
   function reroll(){
     if(state.rerolls<=0) return;
-    const keep=new Set(Object.values(state.slots).filter(Boolean).map(c=>c.text));
-    state.hand = state.hand.map(c=>{ const n=drawWord(c.cat, new Set([...keep, ...state.hand.map(h=>h.text)])); keep.add(n.text); return n; });
+    const n = state.hand.length; state.hand = [];
+    for(let i=0;i<n;i++) state.hand.push(drawCard(inPlay()));
     state.rerolls--; selected=null; render();
   }
-  const word = k => state.slots[k]?.text || null;
 
   /* ---------- 문장 ---------- */
   function sentenceParts(){
-    const w = Object.fromEntries(ORDER.map(k=>[k, word(k)]));
-    const S = k => ({text:w[k]||CATS[k].label, slot:{label:CATS[k].label, color:CATS[k].color, filled:!!w[k]}});
+    const S = k => {
+      const f = fitted(k), c = state.slots[k];
+      return {text: f ? f.text : CATS[k].label,
+        slot:{key:k, label:CATS[k].label, color:CATS[k].color, filled:!!c, word:c?.text || null, cardCat:c?.cat || null, glue:f?.glue || null, bad:f?.bad || null}};
+    };
     const T = text => ({text});
+    const who = word("who"), unit = word("unit");
     return [
-      S("who"), T(w.who ? iGa(w.who)+" " : "이(가) "), S("where"), T("에서 "), S("like"), T(" "), S("act"), T(". "),
-      S("hit"), T("에 닿으면 "), S("result"), T(". 점수는 "), S("unit"), T((w.unit?euro(w.unit):"(으)로")+" 센다.")
+      S("who"), T(who ? iGa(who)+" " : "이(가) "), S("where"), T("에서 "), S("like"), T(" "), S("act"), T(". "),
+      S("hit"), T("에 닿으면 "), S("result"), T(". 점수는 "), S("unit"), T((unit?euro(unit):"(으)로")+" 센다.")
     ];
   }
 
   /* ---------- 그리기 ---------- */
   const TEMPLATE = `
-    <div class="ph"><h2>작업대</h2><span>카드를 누른 뒤 같은 색 칸을 누르세요 (끌어다 놓아도 돼요)</span></div>
+    <div class="ph"><h2>작업대</h2><span>카드는 아무 칸에나 놓을 수 있어요. 품사가 안 맞으면 연결 토큰이 붙어요</span></div>
     <div class="row">
-      <button class="btn" data-act="reroll">패 바꾸기 <b data-rerolls>3</b></button>
-      <button class="btn" data-act="auto">손패로 자동 채우기</button>
+      <button class="btn" data-act="reroll">손패 다시 뽑기 <b data-rerolls>3</b></button>
       <button class="btn" data-act="new">새 판</button>
+      <span class="glue-meter" data-glue></span>
     </div>
     <div class="hand" data-hand aria-label="손패"></div>
     <div class="script">
@@ -107,14 +113,14 @@
       <div class="blk ctrl"><span>만약</span><span data-slot="hit"></span><span>에 닿으면</span><span data-slot="result"></span></div>
       <div class="blk var"><span>점수 단위를</span><span data-slot="unit"></span><span data-j="unit">(으)로 정하기</span></div>
     </div>
-    <p class="hint">칸에 놓인 카드를 다시 누르면 손패로 돌아와요. 패 바꾸기는 칸에 놓이지 않은 카드만 새로 뽑아요.</p>`;
+    <p class="hint">칸에 놓인 카드를 다시 누르면 손패로 돌아와요. 손패는 무작위라 칸에 딱 맞는 카드가 없을 수도 있어요. 그게 이 게임이에요.</p>`;
 
   function cardEl(c){
     const b=document.createElement("button");
     b.className="card"+(selected===c.id?" sel":""); b.dataset.id=c.id; b.draggable=true;
     b.style.setProperty("--r", c.r+"deg"); b.style.setProperty("--c", `var(${CATS[c.cat].color})`);
     b.innerHTML=`<span class="cat"><span class="dot"></span></span><span></span>`;
-    b.firstChild.append(CATS[c.cat].label);
+    b.firstChild.append(window.Grammar ? Grammar.LABEL[Grammar.typeOf(c.cat)] : CATS[c.cat].label);
     b.lastChild.textContent=c.text;
     b.setAttribute("aria-pressed", selected===c.id);
     b.onclick=()=>{ selected = selected===c.id?null:c.id; render(); };
@@ -122,39 +128,44 @@
     b.ondragend=()=>{ selected=null; render(); };
     return b;
   }
-  function slotEl(cat){
-    const c=state.slots[cat], b=document.createElement("button");
-    b.className="slot"+(c?"":" empty"); b.dataset.cat=cat;
-    b.style.setProperty("--c", `var(${CATS[cat].color})`);
+  function slotEl(k){
+    const c=state.slots[k], f=fitted(k), b=document.createElement("button");
+    b.className="slot"+(c?"":" empty"); b.dataset.cat=k;
+    b.style.setProperty("--c", `var(${c ? CATS[c.cat].color : CATS[k].color})`);
     b.innerHTML=`<span class="dot"></span><span></span>`;
-    b.lastChild.textContent = c ? c.text : CATS[cat].label;
-    b.setAttribute("aria-label", `${CATS[cat].label} 칸: ${c?c.text:"비어 있음"}`);
-    b.onclick=()=>{
-      const sc=state.hand.find(x=>x.id===selected);
-      if(sc && sc.cat===cat){ place(selected,cat); return; }
-      if(c) unplace(cat);
-    };
-    b.ondragover=e=>{ const sc=state.hand.find(x=>x.id===selected); if(sc&&sc.cat===cat){ e.preventDefault(); b.classList.add("over"); } };
+    b.lastChild.textContent = c ? c.text : CATS[k].label;
+    if(f?.glue){ const g=document.createElement("span"); g.className="glue"; g.textContent="+"+f.glue; b.appendChild(g); }
+    b.setAttribute("aria-label", `${CATS[k].label} 칸: ${c ? (f?.text || c.text) : "비어 있음"}`);
+    b.onclick=()=>{ if(selected){ place(selected,k); return; } if(c) unplace(k); };
+    b.ondragover=e=>{ if(selected){ e.preventDefault(); b.classList.add("over"); } };
     b.ondragleave=()=>b.classList.remove("over");
-    b.ondrop=e=>{ e.preventDefault(); place(e.dataTransfer.getData("text/plain")||selected, cat); };
+    b.ondrop=e=>{ e.preventDefault(); place(e.dataTransfer.getData("text/plain")||selected, k); };
     return b;
   }
   function render(){
     const hand=q("[data-hand]"); hand.innerHTML="";
-    const sorted=[...state.hand].sort((a,b)=>ORDER.indexOf(a.cat)-ORDER.indexOf(b.cat));
-    sorted.forEach(c=>hand.appendChild(cardEl(c)));
-    if(!sorted.length){ const p=document.createElement("span"); p.className="hand-empty"; p.textContent="손패가 비었어요. 칸의 카드를 눌러 돌려받을 수 있어요."; hand.appendChild(p); }
+    state.hand.forEach(c=>hand.appendChild(cardEl(c)));
+    if(!state.hand.length){ const p=document.createElement("span"); p.className="hand-empty"; p.textContent="손패가 비었어요. 칸의 카드를 눌러 돌려받을 수 있어요."; hand.appendChild(p); }
     root.querySelectorAll("[data-slot]").forEach(h=>h.replaceChildren(slotEl(h.dataset.slot)));
     q('[data-j="who"]').textContent = word("who") ? iGa(word("who")) : "이(가)";
     q('[data-j="unit"]').textContent = (word("unit") ? euro(word("unit")) : "(으)로")+" 정하기";
     q("[data-rerolls]").textContent=state.rerolls;
     q('[data-act="reroll"]').disabled = state.rerolls<=0 || !state.hand.length;
+    if(window.Grammar){
+      const used = ORDER.filter(k=>fitted(k)?.glue).length;
+      const el=q("[data-glue]"); el.textContent=`연결 토큰 ${used}/${Grammar.BUDGET}`; el.classList.toggle("over", used>Grammar.BUDGET);
+    }
     highlight(); save();
     listeners.forEach(fn=>fn());
   }
+  /* 카드를 고르면 모든 칸이 받을 수 있다고 표시. 품사가 안 맞는 칸은 연결 토큰이 든다는 표시 */
   function highlight(){
     const sc = state.hand.find(x=>x.id===selected);
-    root.querySelectorAll(".slot").forEach(s=>s.classList.toggle("target", !!sc && sc.cat===s.dataset.cat));
+    root.querySelectorAll(".slot").forEach(s=>{
+      const fits = sc && (!window.Grammar || Grammar.accepts(s.dataset.cat, sc.cat));
+      s.classList.toggle("target", !!sc && fits);
+      s.classList.toggle("target-glue", !!sc && !fits);
+    });
   }
 
   /* ---------- 이 브라우저에 판 기억 ---------- */
@@ -170,7 +181,6 @@
     mount(el){
       root = el; root.innerHTML = TEMPLATE;
       q('[data-act="reroll"]').onclick = reroll;
-      q('[data-act="auto"]').onclick = ()=>{ autoFill(); render(); };
       q('[data-act="new"]').onclick = newGame;
       if(load()) render(); else newGame();
     },
