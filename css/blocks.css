@@ -1,0 +1,56 @@
+/* 블록 코딩 조합 담당: 단어 카드, 스크래치식 블록, 빈칸 */
+:root{
+  --card:#FFFDF6; --card-ink:#2A2A33; --slot:#FFFFFF; --slot-ink:#2A2A33;
+  /* 카테고리 색 (words.js 의 color 와 이름이 같아야 해요) */
+  --c-who:#E89B00; --c-where:#22936A; --c-like:#D13F78; --c-act:#3A68DB; --c-hit:#8452D1; --c-result:#DD5A24; --c-unit:#14909E;
+  /* 블록 색 */
+  --b-event:#F2B21D; --b-event-d:#C98F05; --b-ctrl:#F08A24; --b-ctrl-d:#C76A10; --b-motion:#4C7BEA; --b-motion-d:#2F5BC4; --b-var:#16A3A0; --b-var-d:#0E7F7C;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --card:#262A37; --card-ink:#F1F2F6; --slot:#F4F5F9; --slot-ink:#1E2230;
+  --c-who:#FFB52E; --c-where:#3CC48F; --c-like:#F06A9E; --c-act:#6F95FF; --c-hit:#A983F0; --c-result:#FF8250; --c-unit:#36BFCB}}
+:root[data-theme="dark"]{
+  --card:#262A37; --card-ink:#F1F2F6; --slot:#F4F5F9; --slot-ink:#1E2230;
+  --c-who:#FFB52E; --c-where:#3CC48F; --c-like:#F06A9E; --c-act:#6F95FF; --c-hit:#A983F0; --c-result:#FF8250; --c-unit:#36BFCB}
+
+.card:focus-visible,.slot:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* 손패 */
+.hand{display:flex;flex-wrap:wrap;gap:10px;min-height:64px;padding:4px 2px}
+.card{background:var(--card);color:var(--card-ink);border:1.5px solid var(--line);border-radius:10px;padding:6px 12px 8px;
+  font-family:var(--f-block);font-size:17px;line-height:1.2;display:flex;flex-direction:column;gap:2px;
+  box-shadow:0 2px 0 var(--line);transform:rotate(var(--r,0deg));transition:transform .15s,box-shadow .15s;user-select:none;touch-action:manipulation}
+.card:hover{transform:rotate(0) translateY(-2px)}
+.card .cat{font-family:var(--f-body);font-size:11px;letter-spacing:.06em;display:flex;align-items:center;gap:5px;color:var(--muted)}
+.card.sel{border-color:var(--c);box-shadow:0 0 0 3px var(--c);transform:rotate(0) translateY(-3px)}
+.hand-empty{color:var(--muted);font-size:13px;align-self:center}
+
+/* 블록 스크립트 */
+.script{display:flex;flex-direction:column;padding:6px 0 12px;overflow-x:auto}
+.blk{position:relative;color:#fff;background:var(--b);font-family:var(--f-block);font-size:17px;padding:10px 14px 12px;border-radius:6px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:max-content;max-width:100%;min-width:260px;margin-bottom:-2px;
+  box-shadow:inset 0 -3px 0 var(--d)}
+.blk::after{content:"";position:absolute;left:18px;bottom:-7px;width:26px;height:8px;background:var(--b);border-radius:0 0 5px 5px;z-index:2;box-shadow:inset 0 -2px 0 var(--d)}
+.ev{--b:var(--b-event);--d:var(--b-event-d);border-radius:26px 26px 6px 6px / 18px 18px 6px 6px;padding-top:16px;color:#2B2000}
+.ctrl{--b:var(--b-ctrl);--d:var(--b-ctrl-d)}
+.mot{--b:var(--b-motion);--d:var(--b-motion-d)}
+.var{--b:var(--b-var);--d:var(--b-var-d)}
+.cblk{display:flex;flex-direction:column;width:max-content;max-width:100%;margin-bottom:-2px;position:relative}
+.cblk .top{border-radius:6px 6px 0 6px;box-shadow:none;padding-bottom:10px}
+.cblk .top::after{left:40px}
+.cblk .mid{display:flex}
+.cblk .arm{width:22px;background:var(--b-ctrl);flex:none}
+.cblk .inner{padding:2px 0 4px;min-width:0}
+.cblk .inner .blk{margin:0}
+.cblk .foot{height:22px;width:120px;background:var(--b-ctrl);border-radius:0 6px 6px 6px;box-shadow:inset 0 -3px 0 var(--b-ctrl-d);position:relative}
+.cblk .foot::after{content:"";position:absolute;left:18px;bottom:-7px;width:26px;height:8px;background:var(--b-ctrl);border-radius:0 0 5px 5px;box-shadow:inset 0 -2px 0 var(--b-ctrl-d)}
+.cblk .foot small{position:absolute;right:8px;top:2px;font-size:13px;color:#fff;font-family:var(--f-block)}
+.blk .flag{width:20px;height:20px;flex:none}
+
+/* 빈칸 */
+.slot{background:var(--slot);color:var(--slot-ink);border:2px dashed transparent;border-radius:999px;padding:4px 12px;min-width:92px;min-height:32px;
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--f-block);font-size:16px;line-height:1.15;text-align:left;transition:box-shadow .15s}
+.slot.empty{color:#8A90A3;border-color:var(--c)}
+.slot.target{box-shadow:0 0 0 4px rgba(255,255,255,.85),0 0 0 7px var(--c);animation:pulse 1s ease-in-out infinite}
+.slot.over{transform:scale(1.06)}
+@keyframes pulse{50%{box-shadow:0 0 0 4px rgba(255,255,255,.85),0 0 0 10px var(--c)}}

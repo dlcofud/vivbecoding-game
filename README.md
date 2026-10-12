@@ -13,11 +13,55 @@
 
 ## 실행
 
-`index.html` 하나로 동작합니다. 브라우저로 열면 됩니다.
+`index.html`을 브라우저로 열면 됩니다.
 
 - **Claude Artifact 안에서 열 때**: "토큰 연결하고 게임 만들기" 버튼이 Claude를 직접 불러 게임을 빌드합니다.
-- **그 밖의 곳(로컬 파일, GitHub Pages 등)에서 열 때**: Claude 연결이 없으므로 "명령어 복사"로 명령어를 복사해 원하는 바이브 코딩 도구(Claude, Claude Code 등)에 붙여 넣으세요.
+- **그 밖의 곳(로컬 파일, GitHub Pages 등)에서 열 때**: Claude 연결이 없으므로 "명령어 복사"로 명령어를 복사해 원하는 바이브 코딩 도구에 붙여 넣으세요.
+
+## 파일 구조와 담당
+
+| 파일 | 담당 | 내용 |
+|---|---|---|
+| `js/words.js` | 블록 조합 | 카테고리와 단어 카드 목록 |
+| `js/blocks.js` | 블록 조합 | 손패, 블록 모양, 빈칸 채우기, 문장 만들기 |
+| `css/blocks.css` | 블록 조합 | 카드·블록·빈칸 스타일, 카테고리 색 |
+| `js/converter.js` | 토큰 변환기 | 명령어 만들기, 토큰 계산, Claude 빌드, 무대, (다운로드 등 추가 기능) |
+| `css/converter.css` | 토큰 변환기 | 토큰 변환기·무대 스타일 |
+| `index.html` | 공용 | 빈 틀. 두 부분이 들어갈 자리(`#workbench`, `#converter`)만 있음 |
+| `js/main.js` | 공용 | 두 부분을 화면에 붙이고 연결 (4줄) |
+| `css/base.css` | 공용 | 페이지 틀, 패널, 버튼, 공용 색 |
+
+각자 자기 담당 파일만 고치면 서로 충돌이 나지 않습니다. 공용 파일을 고쳐야 하면 미리 말해 주세요.
+
+## 두 부분이 주고받는 약속
+
+토큰 변환기는 블록 쪽을 `window.Blocks`로만 읽습니다. 아래 함수의 **이름과 돌려주는 모양**만 지키면, 블록 쪽은 카테고리를 늘리든 블록 모양을 바꾸든 자유입니다.
+
+| 함수 | 돌려주는 것 |
+|---|---|
+| `Blocks.mount(el)` | 작업대를 `el` 안에 그림 |
+| `Blocks.onChange(fn)` | 카드가 움직일 때마다 `fn()` 호출 |
+| `Blocks.filledCount()` / `Blocks.total()` | 채운 칸 수 / 전체 칸 수 |
+| `Blocks.isComplete()` | 다 채웠으면 `true` |
+| `Blocks.sentence()` | 완성 문장 (문자열) |
+| `Blocks.sentenceParts()` | `[{text, slot?:{label, color, filled}}]` — 문장을 색칠해서 보여줄 때 |
+| `Blocks.guide()` | `["주인공 (플레이어가 조종): 매국노", ...]` — 명령어의 해석 가이드 줄 |
+| `Blocks.title()` | 게임 이름으로 쓸 짧은 단어 |
+
+이 약속을 바꿔야 하면 두 사람이 같이 정하고, 위 표도 함께 고쳐 주세요.
+
+## 같이 작업하는 법
+
+```bash
+git pull                      # 시작 전에 항상 최신으로
+git switch -c blocks/카드추가   # 자기 작업용 브랜치
+# ... 담당 파일 수정 ...
+git add -A && git commit -m "카드 추가"
+git push -u origin blocks/카드추가
+```
+
+GitHub에서 Pull Request를 열고 상대가 확인한 뒤 `master`에 합칩니다.
 
 ## 단어 카드 추가
 
-`index.html`의 `CATS` 객체에서 카테고리별 `words` 배열에 단어를 넣으면 됩니다.
+`js/words.js`의 카테고리별 `words` 배열에 단어를 넣으면 됩니다.

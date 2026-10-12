@@ -1,0 +1,36 @@
+/* 토큰 변환기·무대 담당: 문장, 토큰 조각, 빌드 버튼, 무대(iframe), 코드/명령어 탭 */
+:root{
+  --stage:#0F1220;
+  --tok1:#E3E8FF; --tok2:#FFE6D6; --tok3:#DDF4E8; --tok4:#F8E0F0;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --stage:#090B13; --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A}}
+:root[data-theme="dark"]{
+  --stage:#090B13; --tok1:#2A3266; --tok2:#5A3420; --tok3:#1E4A36; --tok4:#55224A}
+
+/* 토큰 변환기 */
+.sentence{font-family:var(--f-block);font-size:clamp(20px,2.6vw,26px);line-height:1.45;margin:0;text-wrap:balance}
+.sentence .w{border-bottom:3px solid var(--c);padding-inline:1px}
+.sentence .gap{color:var(--muted);border-bottom:3px dotted var(--muted)}
+.tokens{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--f-mono);font-size:13px}
+.tok{padding:1px 4px;border-radius:4px;background:var(--tok1)}
+.tok:nth-child(4n+2){background:var(--tok2)}.tok:nth-child(4n+3){background:var(--tok3)}.tok:nth-child(4n+4){background:var(--tok4)}
+.meter{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.meter b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:15px}
+.go{display:flex;gap:8px;flex-wrap:wrap}
+.cta{background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;padding:12px 18px;font-family:var(--f-block);font-size:19px;flex:1 1 220px;
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.2)}
+.cta:disabled{opacity:.5;cursor:not-allowed}
+.status{font-size:13px;color:var(--muted);min-height:1.5em;margin:0}
+
+/* 무대 */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:6px 10px;color:var(--muted);font-weight:600;font-size:14px}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
+.stage{position:relative;background:var(--stage);border-radius:10px;aspect-ratio:4/3;max-width:100%;overflow:hidden}
+.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+.stage .idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#B9C0DA;text-align:center;padding:24px}
+.stage .idle strong{font-family:var(--f-display);font-weight:400;font-size:26px;color:#fff}
+.stage .idle p{margin:0;max-width:34ch;font-size:14px}
+.codebox{background:var(--stage);color:#C9D2F5;font-family:var(--f-mono);font-size:12px;line-height:1.55;border-radius:10px;padding:12px;
+  height:min(60vh,420px);overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0}

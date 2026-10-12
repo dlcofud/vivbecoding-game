@@ -1,0 +1,49 @@
+/* 공용 스타일: 페이지 틀, 패널, 버튼, 공용 색 토큰
+   블록 전용 색은 blocks.css, 토큰 변환기·무대 전용 색은 converter.css 에 있습니다. */
+:root{
+  --bg:#EEF1F7; --grid:#D9DEEA; --panel:#FFFFFF; --ink:#1F2433; --muted:#6B7287; --line:#D5DAE6;
+  --accent:#4C5BD4; --accent-ink:#FFFFFF;
+  --f-display:"Black Han Sans","Jua",system-ui,sans-serif;
+  --f-block:"Jua","IBM Plex Sans KR",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12141B; --grid:#1E2230; --panel:#1B1E29; --ink:#E7EAF3; --muted:#9097AD; --line:#2C3142;
+  --accent:#7C88F2; --accent-ink:#0F1220;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141B; --grid:#1E2230; --panel:#1B1E29; --ink:#E7EAF3; --muted:#9097AD; --line:#2C3142;
+  --accent:#7C88F2; --accent-ink:#0F1220;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  background-image:radial-gradient(var(--grid) 1.2px,transparent 1.2px);background-size:22px 22px}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:18px 40px;display:flex;flex-direction:column;gap:16px}
+button{font:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,4.5vw,44px);line-height:1;margin:0;letter-spacing:-.5px}
+h1 small{display:block;font-family:var(--f-body);font-size:14px;color:var(--muted);letter-spacing:0;margin-top:8px;font-weight:400}
+
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ph{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ph h2{margin:0;font-family:var(--f-block);font-weight:400;font-size:20px}
+.ph span{font-size:12.5px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+
+.btn{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn b{font-variant-numeric:tabular-nums;color:var(--accent)}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
