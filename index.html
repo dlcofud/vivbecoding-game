@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>아무말 컴파일러</title>
+<title>아무말 게임 심사</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <!-- 공용 -->
@@ -16,7 +16,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>아무말 컴파일러<small>받은 단어 카드로 블록을 채우면, 그 아무말이 그대로 바이브 코딩 명령이 되어 게임으로 빌드됩니다.</small></h1>
+    <h1>직접 게임을 만들고 심사받아보세요<small>무작위 단어 카드로 게임 한 줄을 짜고, 심사위원을 골라 제출하세요. 통과하면 그 문장이 진짜 게임이 됩니다.</small></h1>
   </header>
 
   <div class="grid">
@@ -33,6 +33,12 @@
 <script src="js/layouts.js"></script>
 <script src="js/blocks.js"></script>
 <!-- 토큰 변환기·무대 담당 -->
+<script src="js/sounds.js"></script>
+<script src="js/judges.js"></script>
+<script src="js/grammar.js"></script>
+<script src="js/game-template.js"></script>
+<script src="js/word-meta.js"></script>
+<script src="js/token-saver.js"></script>
 <script src="js/converter.js"></script>
 <!-- 공용: 두 부분을 연결 -->
 <script src="js/main.js"></script>
